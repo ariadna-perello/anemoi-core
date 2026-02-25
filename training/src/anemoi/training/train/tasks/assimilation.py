@@ -84,7 +84,7 @@ class GraphAnalysisToAnalysis(BaseGraphModule):
         for dataset_name, dataset_batch in batch.items():
             y[dataset_name] = dataset_batch[
                 :,
-                0,
+                -1,
                 ...,
                 self.data_indices[dataset_name].data.output.full,
             ]

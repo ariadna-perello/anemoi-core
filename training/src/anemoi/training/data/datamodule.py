@@ -120,6 +120,10 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
         """Determine a list of relative time indices to load for each batch."""
         if hasattr(self.config.training, "explicit_times"):
             return sorted(set(self.config.training.explicit_times.input + self.config.training.explicit_times.target))
+        
+        if hasattr(self.config.training, "auto" ) and self.config.training.auto: 
+            return [self.timeincrement * mstep for mstep in range(1)]
+
 
         # Calculate indices using n_step_input, n_step_output and rollout
         rollout_cfg = getattr(getattr(self.config, "training", None), "rollout", None)
