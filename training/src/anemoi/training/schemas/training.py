@@ -498,7 +498,7 @@ class AutoencoderSchema(ForecasterSchema):
 class AnalysisToAnalysisSchema(ForecasterSchema):
     model_task: Literal["anemoi.training.train.tasks.GraphAnalysisToAnalysis",] = Field(..., alias="model_task")
     "Training objective."
-    #auto: 
+    auto: bool = Field(example=True)
 
 
 class InterpolationMultiSchema(BaseTrainingSchema):

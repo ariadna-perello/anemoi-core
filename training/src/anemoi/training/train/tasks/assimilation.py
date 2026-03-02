@@ -68,17 +68,17 @@ class GraphAnalysisToAnalysis(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
-
+        
         for dataset_name, dataset_batch in batch.items():
             x[dataset_name] = dataset_batch[
                 :,
-                0,
+                :,
                 ...,
                 self.data_indices[dataset_name].data.input.full,
             ]
 
         y_pred = self(x)
-
+        
         y = {}
 
         for dataset_name, dataset_batch in batch.items():

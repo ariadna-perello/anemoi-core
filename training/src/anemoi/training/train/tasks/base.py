@@ -929,7 +929,6 @@ class BaseGraphModule(pl.LightningModule, ABC):
         assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
-
         train_loss, *_ = self._step(batch)
         train_loss = train_loss.sum()
 

@@ -376,7 +376,6 @@ class MultiDataset(IterableDataset):
         for name, dataset in self.datasets.items():
             grid_shard_indices = self.grid_indices[name].get_shard_indices(self.reader_group_rank)
             x[name] = dataset.get_sample(time_indices, grid_shard_indices)
-
         return x
 
     def __iter__(self) -> dict[str, torch.Tensor]:

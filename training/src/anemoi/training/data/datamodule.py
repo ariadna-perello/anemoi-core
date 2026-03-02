@@ -122,7 +122,8 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
             return sorted(set(self.config.training.explicit_times.input + self.config.training.explicit_times.target))
         
         if hasattr(self.config.training, "auto" ) and self.config.training.auto: 
-            return [self.timeincrement * mstep for mstep in range(1)]
+            timeincrement=1 #single time step
+            return [timeincrement * mstep for mstep in range(1)]
 
 
         # Calculate indices using n_step_input, n_step_output and rollout
@@ -142,6 +143,7 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
         n_step_input = self.config.training.multistep_input
         n_step_output = self.config.training.multistep_output  # defaults to 1
         time_range = n_step_input + rollout * n_step_output
+        print("--------------------------------relative_date_indices = ", list(range(time_range)))
         return list(range(time_range))
 
     @cached_property
