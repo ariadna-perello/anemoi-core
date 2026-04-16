@@ -167,6 +167,10 @@ class BaseGraphModule(pl.LightningModule, ABC):
         assert isinstance(graph_data, HeteroData), "graph_data must be a HeteroData object"
         assert isinstance(data_indices, dict), "data_indices must be a dict keyed by dataset name"
 
+        # Epoch durations 
+        self.epoch_start_time = None
+        self.epoch_durations = []
+
         # Handle dictionary of graph_data
         graph_data = graph_data.to(self.device)
         self.dataset_names = list(data_indices.keys())

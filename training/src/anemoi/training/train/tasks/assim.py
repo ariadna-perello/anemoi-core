@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import time 
+
 from torch.utils.checkpoint import checkpoint
 
 from anemoi.training.diagnostics.callbacks.plot_adapter import AutoencoderPlotAdapter
@@ -78,5 +80,19 @@ class GraphAssim(BaseGraphModule):
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
         return loss, metrics, [y_pred]
 
+
+    def on_train_epoch_start(self): 
+        self.epoch_start_time = time.time()
+
     def on_train_epoch_end(self) -> None:
-        pass
+        duration = time.time() - self.epoch_start_time
+        self.epoch_durations.append(duration)
+        LOGGER.info(f"Epoch duration : {duration}")
+        self.log("epoch_duration",duration,on_epoch=True, on_step=False, prog_bar=False, logger=self.logger_enabled,)
+
+    def on_train_end(self):
+        if self.epoch_durations:
+            avg = sum(self.epoch_durations) / len(self.epoch_durations)
+            LOGGER.info(f"Mean duration of an epoch : {avg:.2f}s")
+
+

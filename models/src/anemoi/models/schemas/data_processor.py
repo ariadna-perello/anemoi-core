@@ -48,6 +48,15 @@ class ImputerSchema(BaseModel):
     none: Union[list[str], None] = Field(default_factory=list)
     "Variables not to be imputed."
 
+class ImputerOnlySchema(BaseModel):
+    default: str = Field(literals=["none", "mean", "stdev"])
+    "Imputer default method to apply."
+    maximum: Union[list[str], None] = Field(default_factory=list)
+    minimum: Union[list[str], None] = Field(default_factory=list)
+    mean: Union[list[str], None] = Field(default_factory=list)
+    none: Union[list[str], None] = Field(default_factory=list)
+    "Variables not to be imputed."
+
 
 class ConstantImputerSchema(RootModel[dict[Any, Any]]):
     """Schema for ConstantImputer.
@@ -234,7 +243,8 @@ class RemapperSchema(BaseModel):
 
 class PreprocessorTarget(str, Enum):
     normalizer = "anemoi.models.preprocessing.normalizer.InputNormalizer"
-    imputer = "anemoi.models.preprocessing.imputer.InputOnlyImputer"
+    imputer = "anemoi.models.preprocessing.imputer.InputImputer"
+    only_imputer = "anemoi.models.preprocessing.imputer.InputOnlyImputer"
     const_imputer = "anemoi.models.preprocessing.imputer.ConstantImputer"
     remapper = "anemoi.models.preprocessing.remapper.Remapper"
     postprocessor = "anemoi.models.preprocessing.postprocessor.Postprocessor"
@@ -246,6 +256,7 @@ class PreprocessorTarget(str, Enum):
 target_to_schema = {
     PreprocessorTarget.normalizer: NormalizerSchema,
     PreprocessorTarget.imputer: ImputerSchema,
+    PreprocessorTarget.only_imputer : ImputerOnlySchema, 
     PreprocessorTarget.const_imputer: ConstantImputerSchema,
     PreprocessorTarget.remapper: RemapperSchema,
     PreprocessorTarget.postprocessor: PostprocessorSchema,
