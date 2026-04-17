@@ -1104,6 +1104,8 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         tuple[np.ndarray, np.ndarray]
             The data and output tensors for plotting
         """
+
+        print("-------------------------OUTPUTS------------------",dataset_name,outputs)
         if self.latlons is None:
             self.latlons = {}
 
@@ -1130,7 +1132,9 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
             .detach()
             .cpu()
         )
+        
         data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
+        print("DATA--------------", data.size())
         output_tensor = torch.cat(
             tuple(
                 self.post_processors[dataset_name](x[dataset_name][:, ...].detach().cpu(), in_place=False)[
@@ -1139,6 +1143,8 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
                 for x in outputs[1]
             ),
         )
+
+        print("OUTPUT TENSOR", output_tensor.size()) 
 
         output_tensor = pl_module.plot_adapter.prepare_plot_output_tensor(output_tensor)
         output_tensor = (
@@ -1152,6 +1158,61 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         data = data.numpy()
 
         return data, output_tensor
+
+
+    def process_forcings(
+        self,
+        pl_module: pl.LightningModule,
+        dataset_name: str,
+        batch: dict[str, torch.Tensor],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Process forcing fields for assimilation use case. 
+
+        Parameters
+        ----------
+        pl_module : pl.LightningModule
+            The LightningModule instance
+        dataset_name : str
+            The name of the dataset to process
+        outputs : tuple[torch.Tensor, list[dict[str, torch.Tensor]]]
+            The outputs from the model. The second element must be a list of dicts
+            (one per outer step). Tasks with a single step (e.g. diffusion, multi-out
+            interpolator) must return [y_pred] so that ``for x in outputs[1]``
+            iterates over steps; if they return the dict directly, iteration would
+            be over dataset names and indexing would fail.
+        batch : dict[str, torch.Tensor]
+            The batch of data
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            The data and output tensors for plotting
+        """
+
+        if self.latlons is None:
+            self.latlons = {}
+
+        if dataset_name not in self.latlons:
+            self.latlons[dataset_name] = pl_module.model.model._graph_data[dataset_name].x.detach()
+            self.latlons[dataset_name] = np.rad2deg(self.latlons[dataset_name].cpu().numpy())
+
+        input_tensor = (
+            batch[dataset_name][
+                :,
+                :,
+                ...,
+                pl_module.data_indices[dataset_name].data.input.full,
+            ]
+            .detach()
+            .cpu()
+        )
+        
+        data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
+        print("DATA--------------", data.size())
+
+        data = data.numpy()
+
+        return data, None
 
 
 class PlotSample(BasePlotAdditionalMetrics):
@@ -1224,23 +1285,44 @@ class PlotSample(BasePlotAdditionalMetrics):
     ) -> None:
         logger = trainer.logger
 
+        print("START PLOTTING--------------------------")
+
         for dataset_name in dataset_names:
+            print("DATASET NAME:", dataset_name)
             # Build dictionary of indices and parameters to be plotted
             diagnostics = (
                 []
                 if self.config.data.datasets[dataset_name].diagnostic is None
                 else self.config.data.datasets[dataset_name].diagnostic
             )
-            plot_parameters_dict = {
-                pl_module.data_indices[dataset_name].model.output.name_to_index[name]: (
-                    name,
-                    name in diagnostics,
-                )
-                for name in self.parameters
-            }
 
-            data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
+            forcings = (
+                []
+                if self.config.data.datasets[dataset_name].forcing is None
+                else self.config.data.datasets[dataset_name].forcing
+            )
+            if len(forcings)==0: 
+                plot_parameters_dict = {
+                    pl_module.data_indices[dataset_name].model.output.name_to_index[name]: (
+                        name,
+                        name in diagnostics
+                    )
+                    for name in self.parameters
+                }
 
+                data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
+            else: 
+                print("FORCINGS---------------")
+                plot_parameters_dict = {
+                    pl_module.data_indices[dataset_name].model.input.name_to_index[name]: (
+                        name,
+                        name in forcings
+                    )
+                    for name in self.parameters
+                }
+
+                data, output_tensor = self.process_forcings(pl_module, dataset_name, batch)
+           
             local_rank = pl_module.local_rank
 
             # Apply spatial mask
@@ -1250,18 +1332,31 @@ class PlotSample(BasePlotAdditionalMetrics):
                 data,
                 output_tensor,
             )
+            
+            print("plot_adapter:", pl_module.plot_adapter)
 
             for item in pl_module.plot_adapter.iter_plot_samples(
                 data,
                 output_tensor,
                 pl_module.plot_adapter.output_times,
                 max_out_steps=self.output_steps,
-            ):
-                if len(item) == 3:
+            ):  
+                print("len(item):", len(item))
+                if len(item) == 1: 
+                    print("OBS OR BACKGROUND PLOTS ---------------------------")
+                    x = item 
+                    y_true = None 
+                    y_pred = None 
+                    tag_suffix = "input"
+
+                elif len(item) == 3:
                     x, y_pred, tag_suffix = item
                     y_true = None
+
                 else:
                     x, y_true, y_pred, tag_suffix = item
+
+                print("plot_predicted_multilevel_flat_sample------------------------")
                 fig = plot_predicted_multilevel_flat_sample(
                     plot_parameters_dict,
                     self.per_sample,

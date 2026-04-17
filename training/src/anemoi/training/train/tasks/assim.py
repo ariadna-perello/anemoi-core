@@ -15,7 +15,7 @@ import time
 
 from torch.utils.checkpoint import checkpoint
 
-from anemoi.training.diagnostics.callbacks.plot_adapter import AutoencoderPlotAdapter
+from anemoi.training.diagnostics.callbacks.plot_adapter import AssimilationPlotAdapter
 from anemoi.training.train.tasks.base import BaseGraphModule
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     import torch
     from omegaconf import DictConfig
-
+    from torch_geometric.data import HeteroData
 
     from anemoi.models.data_indices.collection import IndexCollection
 
@@ -35,6 +35,49 @@ class GraphAssim(BaseGraphModule):
     """Graph neural network assim for PyTorch Lightning."""
 
     task_type = "assim"
+    
+    def __init__(
+        self,
+        *,
+        config: DictConfig,
+        graph_data: HeteroData,
+        statistics: dict,
+        statistics_tendencies: dict,
+        data_indices: IndexCollection,
+        metadata: dict,
+        supporting_arrays: dict,
+    ) -> None:
+        """Initialize graph neural network assimilator. 
+
+        Parameters
+        ----------
+        config : DictConfig
+            Job configuration
+        graph_data : HeteroData
+            Graph object
+        statistics : dict
+            Statistics of the training data
+        data_indices : IndexCollection
+            Indices of the training data,
+        metadata : dict
+            Provenance information
+        supporting_arrays : dict
+            Supporting NumPy arrays to store in the checkpoint
+
+        """
+        super().__init__(
+            config=config,
+            graph_data=graph_data,
+            statistics=statistics,
+            statistics_tendencies=statistics_tendencies,
+            data_indices=data_indices,
+            metadata=metadata,
+            supporting_arrays=supporting_arrays,
+        )
+
+        self._plot_adapter = AssimilationPlotAdapter(self)
+
+
 
     def _step(
         self,

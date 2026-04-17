@@ -217,3 +217,26 @@ class AutoencoderPlotAdapter(BasePlotAdapter):
         sample = data[0, ...].squeeze()
         recon = output_tensor[0, ...].squeeze()
         yield sample, recon, "recon"
+
+
+class AssimilationPlotAdapter(BasePlotAdapter):
+    """Autoencoder: single (sample, recon, tag) yield."""
+
+    @property
+    def output_times(self) -> int:
+        return 1
+
+    def get_init_step(self, rollout_step: int) -> int:
+        del rollout_step
+        return 0
+
+    def iter_plot_samples(
+        self,
+        data: Any,
+        output_tensor: Any,
+        output_times: int,
+        max_out_steps: int | None = None,
+    ) -> Iterator[tuple[Any, Any, str]]:
+        del output_times, max_out_steps
+        sample = data[0, ...].squeeze()
+        yield sample
