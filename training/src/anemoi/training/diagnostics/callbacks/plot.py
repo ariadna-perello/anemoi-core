@@ -1163,60 +1163,6 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         return data, output_tensor
 
 
-    def process_forcings(
-        self,
-        pl_module: pl.LightningModule,
-        dataset_name: str,
-        batch: dict[str, torch.Tensor],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Process forcing fields for assimilation use case. 
-
-        Parameters
-        ----------
-        pl_module : pl.LightningModule
-            The LightningModule instance
-        dataset_name : str
-            The name of the dataset to process
-        outputs : tuple[torch.Tensor, list[dict[str, torch.Tensor]]]
-            The outputs from the model. The second element must be a list of dicts
-            (one per outer step). Tasks with a single step (e.g. diffusion, multi-out
-            interpolator) must return [y_pred] so that ``for x in outputs[1]``
-            iterates over steps; if they return the dict directly, iteration would
-            be over dataset names and indexing would fail.
-        batch : dict[str, torch.Tensor]
-            The batch of data
-
-        Returns
-        -------
-        tuple[np.ndarray, np.ndarray]
-            The data and output tensors for plotting
-        """
-
-        if self.latlons is None:
-            self.latlons = {}
-
-        if dataset_name not in self.latlons:
-            self.latlons[dataset_name] = pl_module.model.model._graph_data[dataset_name].x.detach()
-            self.latlons[dataset_name] = np.rad2deg(self.latlons[dataset_name].cpu().numpy())
-
-        input_tensor = (
-            batch[dataset_name][
-                :,
-                pl_module.n_step_input - 1 : pl_module.n_step_input + 1,
-                ...,
-                pl_module.data_indices[dataset_name].data.input.full,
-            ]
-            .detach()
-            .cpu()
-        )
-        
-        data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
-        print("DATA--------------", data.size())
-
-        data = data.numpy()
-
-        return data, None
-
 
 class PlotSample(BasePlotAdditionalMetrics):
     """Plots a post-processed sample: input, target and prediction."""
@@ -1274,6 +1220,60 @@ class PlotSample(BasePlotAdditionalMetrics):
             "Using defined accumulation colormap for fields: %s",
             self.precip_and_related_fields,
         )
+
+    def process_forcings(
+            self,
+            pl_module: pl.LightningModule,
+            dataset_name: str,
+            batch: dict[str, torch.Tensor],
+        ) -> tuple[np.ndarray, np.ndarray]:
+            """Process forcing fields for assimilation use case. 
+
+            Parameters
+            ----------
+            pl_module : pl.LightningModule
+                The LightningModule instance
+            dataset_name : str
+                The name of the dataset to process
+            outputs : tuple[torch.Tensor, list[dict[str, torch.Tensor]]]
+                The outputs from the model. The second element must be a list of dicts
+                (one per outer step). Tasks with a single step (e.g. diffusion, multi-out
+                interpolator) must return [y_pred] so that ``for x in outputs[1]``
+                iterates over steps; if they return the dict directly, iteration would
+                be over dataset names and indexing would fail.
+            batch : dict[str, torch.Tensor]
+                The batch of data
+
+            Returns
+            -------
+            tuple[np.ndarray, np.ndarray]
+                The data and output tensors for plotting
+            """
+
+            if self.latlons is None:
+                self.latlons = {}
+
+            if dataset_name not in self.latlons:
+                self.latlons[dataset_name] = pl_module.model.model._graph_data[dataset_name].x.detach()
+                self.latlons[dataset_name] = np.rad2deg(self.latlons[dataset_name].cpu().numpy())
+
+            input_tensor = (
+                batch[dataset_name][
+                    :,
+                    pl_module.n_step_input - 1 : pl_module.n_step_input + 1,
+                    ...,
+                    pl_module.data_indices[dataset_name].data.input.full,
+                ]
+                .detach()
+                .cpu()
+            )
+            
+            data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
+            print("DATA--------------", data.size())
+
+            data = data.numpy()
+
+            return data, None
 
     @rank_zero_only
     def _plot(
