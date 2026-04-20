@@ -237,6 +237,13 @@ class AssimilationPlotAdapter(BasePlotAdapter):
         output_times: int,
         max_out_steps: int | None = None,
     ) -> Iterator[tuple[Any, Any, str]]:
-        del output_times, max_out_steps
-        sample = data[0, ...].squeeze()
-        yield sample
+        task = self._task
+        max_out_steps = min(task.n_step_output, max_out_steps or task.n_step_output)
+        x = data[0, ...].squeeze(0)
+        if output_tensor is not None: #analysis
+            y_true = data[-1, ...].squeeze(0)
+            y_pred = output_tensor[0,0,...].squeeze(0)
+            yield x, y_true, y_pred, "analysis"
+        else: 
+            yield x, None, None, "input"
+

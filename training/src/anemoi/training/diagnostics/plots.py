@@ -513,7 +513,7 @@ def plot_predicted_multilevel_flat_sample(
         Input data of shape (lat*lon, nvar*level)
     y_true : np.ndarray or None
         Expected data of shape (lat*lon, nvar*level). If None, only x and y_pred are plotted (e.g. autoencoder).
-    y_pred : np.ndarray
+    y_pred : np.ndarray or None 
         Predicted data of shape (lat*lon, nvar*level)
     datashader: bool, optional
         Scatter plot, by default False
@@ -547,15 +547,20 @@ def plot_predicted_multilevel_flat_sample(
     if colormaps is None:
         colormaps = {}
 
-    for plot_idx, (variable_idx, (variable_name, diagnostic_only)) in enumerate[tuple[str, int]](parameters.items()):
+    for plot_idx, (variable_idx, (variable_name, not_in_diagnostics)) in enumerate[tuple[str, int]](parameters.items()):
         # prognostic: show input; diagnostic: zero input for display
-        xt = (x if x.ndim == 1 else x[..., variable_idx]).reshape(-1) * (0 if diagnostic_only else 1)
+        xt = (x if x.ndim == 1 else x[..., variable_idx]).reshape(-1) * (1 if not_in_diagnostics else 0)
+        print("XT SHAPE:",np.shape(xt))
+        print("XT-----",xt)
         yt = (
             (y_true.reshape(-1) if y_true.ndim == 1 else y_true[..., variable_idx].reshape(-1))
             if y_true is not None
             else None
         )
-        yp = (y_pred if y_pred.ndim == 1 else y_pred[..., variable_idx]).reshape(-1)
+        yp = ((y_pred if y_pred.ndim == 1 else y_pred[..., variable_idx]).reshape(-1)
+             if y_pred is not None 
+             else None 
+        ) 
 
         # get the colormap for the variable as defined in config file
         cmap = colormaps.default.get_cmap() if colormaps.get("default") else cm.get_cmap("viridis")
@@ -618,7 +623,13 @@ def _compute_main_norm(
     if vname in precip_fields:
         return BoundaryNorm(clevels, len(clevels) + 1)
 
-    combined = np.concatenate((input_, pred)) if truth is None else np.concatenate((input_, truth, pred))
+    if truth is None: 
+        if pred is None: 
+            combined = input_
+        else: 
+            combined = np.concatenate((input_, pred))
+    else:  
+        combined = np.concatenate((input_, truth, pred))
 
     return Normalize(
         vmin=np.nanmin(combined),
@@ -694,12 +705,21 @@ def plot_flat_sample(
     if truth is not None:
         data[1:4] = [truth, pred, truth - pred]
         data[5] = truth - input_
+        
     else:
-        data[2] = pred
-        data[4] = pred - input_
-        ax[1].axis("off")
-        ax[3].axis("off")
-        ax[5].axis("off")
+        if pred is not None: 
+            data[2] = pred
+            data[4] = pred - input_
+            ax[1].axis("off")
+            ax[3].axis("off")
+            ax[5].axis("off")
+        else: 
+            print("OBS/BACKGROUND: 1 seul plot")
+            ax[1].axis("off")
+            ax[2].axis("off")
+            ax[3].axis("off")
+            ax[4].axis("off")
+            ax[5].axis("off")
     # default titles for 6 plots
     titles = [
         f"{vname} input",
@@ -727,22 +747,28 @@ def plot_flat_sample(
     norms[2] = main_norm
 
     if np.nansum(input_) != 0:
+        print("INPUT EXISTS---------------")
         # prognostic fields: plot input and increment as well
         data[0] = input_
-        if data[4] is None:
-            data[4] = pred - input_
-        combined_error = np.concatenate(((pred - input_), (truth - input_))) if truth is not None else (pred - input_)
-        norm_error = TwoSlopeNorm(
-            vmin=min(-0.00001, np.nanmin(combined_error)),
-            vcenter=0.0,
-            vmax=max(0.00001, np.nanmax(combined_error)),
-        )
-        norms[0] = main_norm
-        norms[4] = norm_error
-        if truth is not None:
-            norms[5] = norm_error
+
+        if pred is None: 
+            norms[0] = main_norm
+        else: 
+            if data[4] is None:
+                data[4] = pred - input_
+            combined_error = np.concatenate(((pred - input_), (truth - input_))) if truth is not None else (pred - input_)
+            norm_error = TwoSlopeNorm(
+                vmin=min(-0.00001, np.nanmin(combined_error)),
+                vcenter=0.0,
+                vmax=max(0.00001, np.nanmax(combined_error)),
+            )
+            norms[0] = main_norm
+            norms[4] = norm_error
+            if truth is not None:
+                norms[5] = norm_error
 
     else:
+        print("NO INPUT------------------------")
         # diagnostic fields: omit input and increment plots
         ax[0].axis("off")
         ax[4].axis("off")

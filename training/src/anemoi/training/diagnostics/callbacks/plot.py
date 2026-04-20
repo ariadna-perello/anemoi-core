@@ -1122,6 +1122,9 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         # prepare input and output tensors for plotting one dataset specified by dataset_name
         total_targets = pl_module.plot_adapter.get_total_plot_targets()
 
+        print("INPUT DATA BEFORE PROCESS: ", batch[dataset_name].size())
+        print("OUTPUT DATA BEFORE PROCESS: ", outputs[1][0][dataset_name].size())
+
         input_tensor = (
             batch[dataset_name][
                 :,
@@ -1199,7 +1202,7 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         input_tensor = (
             batch[dataset_name][
                 :,
-                :,
+                pl_module.n_step_input - 1 : pl_module.n_step_input + 1,
                 ...,
                 pl_module.data_indices[dataset_name].data.input.full,
             ]
@@ -1296,27 +1299,24 @@ class PlotSample(BasePlotAdditionalMetrics):
                 else self.config.data.datasets[dataset_name].diagnostic
             )
 
-            forcings = (
-                []
-                if self.config.data.datasets[dataset_name].forcing is None
-                else self.config.data.datasets[dataset_name].forcing
-            )
-            if len(forcings)==0: 
+            if len(self.config.data.datasets[dataset_name].forcing) == 0: 
+                print("PAS DE FORCINGS-----------")
                 plot_parameters_dict = {
                     pl_module.data_indices[dataset_name].model.output.name_to_index[name]: (
                         name,
-                        name in diagnostics
+                        name not in diagnostics 
                     )
                     for name in self.parameters
                 }
-
+    
                 data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
+
             else: 
                 print("FORCINGS---------------")
                 plot_parameters_dict = {
                     pl_module.data_indices[dataset_name].model.input.name_to_index[name]: (
                         name,
-                        name in forcings
+                        name not in diagnostics
                     )
                     for name in self.parameters
                 }
@@ -1342,19 +1342,14 @@ class PlotSample(BasePlotAdditionalMetrics):
                 max_out_steps=self.output_steps,
             ):  
                 print("len(item):", len(item))
-                if len(item) == 1: 
-                    print("OBS OR BACKGROUND PLOTS ---------------------------")
-                    x = item 
-                    y_true = None 
-                    y_pred = None 
-                    tag_suffix = "input"
 
-                elif len(item) == 3:
+                if len(item) == 3:
                     x, y_pred, tag_suffix = item
                     y_true = None
 
                 else:
                     x, y_true, y_pred, tag_suffix = item
+                    print("X, Y_TRUE, Y_PRED: ", np.shape(x), np.shape(y_true), np.shape(y_pred))
 
                 print("plot_predicted_multilevel_flat_sample------------------------")
                 fig = plot_predicted_multilevel_flat_sample(
