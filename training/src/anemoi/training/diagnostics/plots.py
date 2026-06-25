@@ -723,12 +723,14 @@ def plot_flat_sample(
         ax[4].axis("off")
         ax[5].axis("off")
 
-        if np.any(input_<=0): #obs ou innovations 
-            print("VALEURS NULLES DANS LES OBS")
-            input_=np.where(input_==0,np.nan,input_)
-            norms[0] = Normalize(vmin=np.nanmin(input_),vmax=np.nanmax(input_),)
-            
-
+        if np.any(input_<=0): #if the input is an innovation 
+            print(f"Negative values in input data")
+            cmaps[0] = error_cmap
+            norms[0]= TwoSlopeNorm(
+                vmin=min(-1e-5, np.nanmin(input_)),
+                vcenter=0.0,
+                vmax=max(1e-5, np.nanmax(input_)),
+            )
         else: 
             main_norm = _compute_main_norm(
                 vname,
@@ -750,7 +752,7 @@ def plot_flat_sample(
 
         if np.any(truth<=0): #if increments are predicted 
             cmaps[1:4] = [error_cmap] * 3
-            arrays_for_norm = [truth, pred, truth - pred]
+            arrays_for_norm = [truth, pred]
             combined = np.concatenate(arrays_for_norm)
             shared_norm = TwoSlopeNorm(
                 vmin=min(-1e-5, np.nanmin(combined)),
@@ -759,7 +761,6 @@ def plot_flat_sample(
             )
             norms[1] = shared_norm
             norms[2] = shared_norm
-            norms[3] = shared_norm
             
 
         else: 
@@ -775,18 +776,26 @@ def plot_flat_sample(
             )
             norms[1] = main_norm
             norms[2] = main_norm
-            norms[3] = TwoSlopeNorm(vcenter=0.0) # center the error colormaps at 0
 
-            '''
-            combined_error = np.concatenate(((pred - input_), (truth - input_)))
-            norm_error = TwoSlopeNorm(
-                vmin=min(-0.00001, np.nanmin(combined_error)),
-                vcenter=0.0,
-                vmax=max(0.00001, np.nanmax(combined_error)),
-            )
-            norms[4] = norm_error
-            norms[5] = norm_error
-            '''
+        print("VALEUR MIN PRED ERROR:", np.nanmin(data[3]))
+        print("VALEUR MAX PRED ERROR:", np.nanmax(data[3]))
+
+        norms[3] = TwoSlopeNorm(
+            vmin=min(-1e-5, np.nanmin(data[3])),
+            vcenter=0.0,
+            vmax=max(1e-5, np.nanmax(data[3])),
+        ) # center the error colormaps at 0
+
+        '''
+        combined_error = np.concatenate(((pred - input_), (truth - input_)))
+        norm_error = TwoSlopeNorm(
+            vmin=min(-0.00001, np.nanmin(combined_error)),
+            vcenter=0.0,
+            vmax=max(0.00001, np.nanmax(combined_error)),
+        )
+        norms[4] = norm_error
+        norms[5] = norm_error
+        '''
 
     for ii in range(6):
         if data[ii] is not None:
@@ -869,6 +878,7 @@ def single_plot(
         lower_limit = 25
         upper_limit = 500
         n_pixels = max(min(int(np.floor(data.shape[0] * 0.004)), upper_limit), lower_limit)
+        print("-----------------NOMBRE DE PIXELS:", n_pixels)
         psc = dsshow(
             df,
             dsh.Point("x", "y"),

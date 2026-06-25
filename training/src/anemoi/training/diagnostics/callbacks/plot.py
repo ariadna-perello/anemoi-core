@@ -116,7 +116,8 @@ class BasePlotCallback(Callback, ABC):
             save_path.parent.mkdir(parents=True, exist_ok=True)
             fig.canvas.draw()
             image_array = np.array(fig.canvas.renderer.buffer_rgba())
-            plt.imsave(save_path, image_array, dpi=100)
+            #plt.imsave(save_path, image_array, dpi=100)
+            plt.imsave(save_path, image_array, dpi=300)
             if logger and logger.logger_name == "wandb":
                 import wandb
 
