@@ -46,6 +46,7 @@ from anemoi.training.diagnostics.plots import plot_predicted_multilevel_flat_sam
 from anemoi.training.losses.base import BaseLoss
 from anemoi.training.losses.utils import reduce_to_last_dim
 from anemoi.training.schemas.base_schema import BaseSchema
+from anemoi.datasets import open_dataset 
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1257,16 +1258,18 @@ class PlotSample(BasePlotAdditionalMetrics):
                 self.latlons[dataset_name] = pl_module.model.model._graph_data[dataset_name].x.detach()
                 self.latlons[dataset_name] = np.rad2deg(self.latlons[dataset_name].cpu().numpy())
 
+
             input_tensor = (
                 batch[dataset_name][
                     :,
-                    pl_module.n_step_input - 1 : pl_module.n_step_input + 1,
+                    : pl_module.n_step_input,
                     ...,
                     pl_module.data_indices[dataset_name].data.input.full,
                 ]
                 .detach()
                 .cpu()
             )
+
             
             data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
             print("DATA--------------", data.size())
@@ -1320,8 +1323,12 @@ class PlotSample(BasePlotAdditionalMetrics):
                     )
                     for name in self.parameters
                 }
-
+                #batch[dataset_name][self.sample_idx]
                 data, output_tensor = self.process_forcings(pl_module, dataset_name, batch)
+                ds_rs = open_dataset("/scratch/work/chabotv/anemoi-dataset/aifsdop-ea-ofb-oper-0001-mars-o96-2010-2024-6h-v1-observations-radiosondes.zarr",select=['t_850'],start='20220315',end='20220315')
+                print(f"DONNÉES {dataset_name} ÉGALES:", np.array_equal(data,ds_rs[1,0,0,:]))
+                
+         
            
             local_rank = pl_module.local_rank
 
@@ -1365,6 +1372,10 @@ class PlotSample(BasePlotAdditionalMetrics):
                     colormaps=self.colormaps,
                     projection_kind=self.projection_kind,
                 )
+                print(f"DATES for {dataset_name} dataset",trainer.datamodule.ds_valid.data[dataset_name].dates)
+                date = trainer.datamodule.ds_valid.data[dataset_name].dates[batch_idx*batch[dataset_name].shape[0]+self.sample_idx]
+                print("DATE:",date)
+                fig.suptitle(f"Date: {date}, Epoch: {epoch}")
 
                 self._output_figure(
                     logger,

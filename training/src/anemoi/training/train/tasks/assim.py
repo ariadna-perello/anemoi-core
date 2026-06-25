@@ -95,6 +95,7 @@ class GraphAssim(BaseGraphModule):
             self.n_step_input == list(dataset_batch.shape)[1]
         ), f"The time dimension does not correspond. Your last input step should also be in your input. So {self.n_step_input } should be equal to {list(dataset_batch.shape)[1]}."
             x[dataset_name] = dataset_batch[:,:self.n_step_input][...,self.data_indices[dataset_name].data.input.full]
+
             if len(x[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data")
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
