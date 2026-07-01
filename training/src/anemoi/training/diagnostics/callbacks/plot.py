@@ -1326,8 +1326,6 @@ class PlotSample(BasePlotAdditionalMetrics):
                 }
                 #batch[dataset_name][self.sample_idx]
                 data, output_tensor = self.process_forcings(pl_module, dataset_name, batch)
-                ds_rs = open_dataset("/scratch/work/chabotv/anemoi-dataset/aifsdop-ea-ofb-oper-0001-mars-o96-2010-2024-6h-v1-observations-radiosondes.zarr",select=['t_850'],start='20220315',end='20220315')
-                print(f"DONNÉES {dataset_name} ÉGALES:", np.array_equal(data,ds_rs[1,0,0,:]))
                 
          
            
