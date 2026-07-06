@@ -12,7 +12,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import time 
-
+import torch
 from torch.utils.checkpoint import checkpoint
 
 from anemoi.training.diagnostics.callbacks.plot_adapter import AssimilationPlotAdapter

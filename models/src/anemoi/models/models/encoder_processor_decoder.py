@@ -250,6 +250,7 @@ class AnemoiModelEncProcDec(BaseGraphModel):
             )
 
             # Encoder for this dataset
+            print(f"DATASET NAME BEFORE ENCODER: {dataset_name}")
             x_data_latent, x_latent = self.encoder[dataset_name](
                 (x_data_latent, x_hidden_latent),
                 batch_size=batch_size,

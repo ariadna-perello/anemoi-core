@@ -967,6 +967,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
         assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
+        print("BATCH SIZE TRAIN:",batch_size)
 
         train_loss, *_ = self._step(batch)
         train_loss = train_loss.sum()
@@ -997,8 +998,12 @@ class BaseGraphModule(pl.LightningModule, ABC):
         del batch_idx
         assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
 
+        print("COMPUTE VAL LOSS")
+
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
+
+        print("BATCH SIZE VALIDATION:",batch_size)
 
         with torch.no_grad():
             val_loss_scales, metrics, *args = self._step(batch, validation_mode=True)

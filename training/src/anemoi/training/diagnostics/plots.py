@@ -11,6 +11,8 @@
 import logging
 
 import datashader as dsh
+#import matplotlib 
+#matplotlib.use('agg')
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
@@ -727,7 +729,7 @@ def plot_flat_sample(
             print(f"Negative values in input data")
             cmaps[0] = error_cmap
             norms[0]= TwoSlopeNorm(
-                vmin=min(-1e-5, np.nanmin(input_)),
+                vmin=-max(1e-5, np.nanmax(input_)),
                 vcenter=0.0,
                 vmax=max(1e-5, np.nanmax(input_)),
             )
@@ -752,15 +754,16 @@ def plot_flat_sample(
 
         if np.any(truth<=0): #if increments are predicted 
             cmaps[1:4] = [error_cmap] * 3
-            arrays_for_norm = [truth, pred]
+            arrays_for_norm = [truth, pred, truth - pred]
             combined = np.concatenate(arrays_for_norm)
             shared_norm = TwoSlopeNorm(
-                vmin=min(-1e-5, np.nanmin(combined)),
+                vmin=-max(1e-5, np.nanmax(combined)),
                 vcenter=0.0,
                 vmax=max(1e-5, np.nanmax(combined)),
             )
             norms[1] = shared_norm
             norms[2] = shared_norm
+            norms[3] = shared_norm
             
 
         else: 
@@ -776,15 +779,11 @@ def plot_flat_sample(
             )
             norms[1] = main_norm
             norms[2] = main_norm
-
-        print("VALEUR MIN PRED ERROR:", np.nanmin(data[3]))
-        print("VALEUR MAX PRED ERROR:", np.nanmax(data[3]))
-
-        norms[3] = TwoSlopeNorm(
-            vmin=min(-1e-5, np.nanmin(data[3])),
-            vcenter=0.0,
-            vmax=max(1e-5, np.nanmax(data[3])),
-        ) # center the error colormaps at 0
+            norms[3] = TwoSlopeNorm(
+                vmin=-max(1e-5, np.nanmax(data[3])),
+                vcenter=0.0,
+                vmax=max(1e-5, np.nanmax(data[3])),
+            ) 
 
         '''
         combined_error = np.concatenate(((pred - input_), (truth - input_)))

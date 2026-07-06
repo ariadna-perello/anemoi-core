@@ -46,7 +46,7 @@ from anemoi.training.diagnostics.plots import plot_predicted_multilevel_flat_sam
 from anemoi.training.losses.base import BaseLoss
 from anemoi.training.losses.utils import reduce_to_last_dim
 from anemoi.training.schemas.base_schema import BaseSchema
-from anemoi.datasets import open_dataset 
+
 
 LOGGER = logging.getLogger(__name__)
 
