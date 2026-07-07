@@ -70,7 +70,8 @@ class BaseGraphModule(pl.LightningModule, ABC):
     - Fully compatible with PyTorch Lightning training and validation loops.
 
     Subclass Responsibilities
-    -------------------------
+    -------------------------Get batch size (handle dict of tensors)
+        batch_size = next(iter(batch.values())).shap
     Child classes must implement the `_step` method, which defines the forward and loss computation
     for training and validation steps.
 

@@ -113,6 +113,7 @@ class AnemoiTrainer(ABC):
         for name, data in datamodule.ds_train.data.items():
             LOGGER.info("Dataset '%s' - Number of variables: %s", name, len(data.variables))
             LOGGER.info("Dataset '%s' - Variables: %s", name, str(data.variables))
+
         return datamodule
 
     @cached_property
@@ -574,6 +575,10 @@ class AnemoiTrainer(ABC):
 
         params["model"] = self.model
         params["datamodule"] = self.datamodule
+        ds_train = self.datamodule.train_dataloader()
+        ds_val = self.datamodule.val_dataloader()
+        print("FIT PARAMETERS TRAIN BATCH SIZE", ds_train.batch_size)
+        print("FIT PARAMETERS VAL BATCH SIZE", ds_val.batch_size)
         params["ckpt_path"] = None if (self.load_weights_only) else self.last_checkpoint
 
         if version.parse("2.6.0") <= PL_VERSION:

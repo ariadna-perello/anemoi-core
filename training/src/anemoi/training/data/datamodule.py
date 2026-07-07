@@ -166,6 +166,7 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
     def _get_dataloader(self, ds: MultiDataset, stage: str) -> DataLoader:
         """Create DataLoader for multi-dataset."""
         assert stage in {"training", "validation", "test"}
+        print(f"BATCH SIZE {stage} GET_DATALOADER:",self.config.dataloader.batch_size[stage])
         return DataLoader(
             ds,
             batch_size=self.config.dataloader.batch_size[stage],
@@ -178,10 +179,14 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Return training dataloader."""
+        ds = self._get_dataloader(self.ds_train, "training")
+        print("train dataloader batch size after init:", ds.batch_size)
         return self._get_dataloader(self.ds_train, "training")
 
     def val_dataloader(self) -> DataLoader:
         """Return validation dataloader."""
+        ds = self._get_dataloader(self.ds_valid, "validation")
+        print("val dataloader batch size after init:", ds.batch_size)
         return self._get_dataloader(self.ds_valid, "validation")
 
     def test_dataloader(self) -> DataLoader:
