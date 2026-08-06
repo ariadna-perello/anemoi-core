@@ -494,6 +494,7 @@ def plot_predicted_multilevel_flat_sample(
     precip_and_related_fields: list | None = None,
     colormaps: dict[str, Colormap] | None = None,
     projection_kind: str = "equirectangular",
+    obs_mask: np.ndarray = None,
 ) -> Figure:
     """Plots data for one multilevel latlon-"flat" sample.
 
@@ -552,8 +553,6 @@ def plot_predicted_multilevel_flat_sample(
     for plot_idx, (variable_idx, (variable_name, not_in_diagnostics)) in enumerate[tuple[str, int]](parameters.items()):
         # prognostic: show input; diagnostic: zero input for display
         xt = (x if x.ndim == 1 else x[..., variable_idx]).reshape(-1) * (1 if not_in_diagnostics else 0)
-        print("XT SHAPE:",np.shape(xt))
-        print("XT-----",xt)
         yt = (
             (y_true.reshape(-1) if y_true.ndim == 1 else y_true[..., variable_idx].reshape(-1))
             if y_true is not None
@@ -587,6 +586,7 @@ def plot_predicted_multilevel_flat_sample(
             cmap=cmap,
             error_cmap=error_cmap,
             transform=transform,
+            obs_mask=obs_mask,
         )
     return fig
 
@@ -650,6 +650,7 @@ def plot_flat_sample(
     cmap: Colormap | None = None,
     error_cmap: Colormap | None = None,
     transform: object | None = None,
+    obs_mask: np.ndarray = None,
 ) -> None:
     """Plot a "flat" 1D sample.
 
@@ -729,9 +730,9 @@ def plot_flat_sample(
             print(f"Negative values in input data")
             cmaps[0] = error_cmap
             norms[0]= TwoSlopeNorm(
-                vmin=-max(1e-5, np.nanmax(input_)),
+                vmin=-max(1e-5, 2*np.nanstd(input_)),
                 vcenter=0.0,
-                vmax=max(1e-5, np.nanmax(input_)),
+                vmax=max(1e-5, 2*np.nanstd(input_)),
             )
         else: 
             main_norm = _compute_main_norm(
@@ -748,18 +749,21 @@ def plot_flat_sample(
     else: 
         print("NO INPUT------------------------")
         ax[0].axis("off")
-        data[1:4] = [truth, pred, truth - pred] 
+        data[1:4] = [truth, pred, truth - pred]
+        mse = ((truth-pred)**2).mean()
+        cor = np.corrcoef(truth,pred)[0,1]
+        ax[2].text(0.5, -0.15, f"MSE={mse}, cor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
         ax[4].axis("off")
         ax[5].axis("off")
 
         if np.any(truth<=0): #if increments are predicted 
             cmaps[1:4] = [error_cmap] * 3
-            arrays_for_norm = [truth, pred, truth - pred]
-            combined = np.concatenate(arrays_for_norm)
+            #arrays_for_norm = [truth, pred, truth - pred]
+            #combined = np.concatenate(arrays_for_norm)
             shared_norm = TwoSlopeNorm(
-                vmin=-max(1e-5, np.nanmax(combined)),
+                vmin=-max(1e-5, 2*np.nanstd(truth)),
                 vcenter=0.0,
-                vmax=max(1e-5, np.nanmax(combined)),
+                vmax=max(1e-5, 2*np.nanstd(truth)),
             )
             norms[1] = shared_norm
             norms[2] = shared_norm
@@ -795,7 +799,6 @@ def plot_flat_sample(
         norms[4] = norm_error
         norms[5] = norm_error
         '''
-
     for ii in range(6):
         if data[ii] is not None:
             single_plot(
@@ -809,6 +812,7 @@ def plot_flat_sample(
                 title=titles[ii],
                 datashader=datashader,
                 transform=transform,
+                obs_mask=obs_mask,
             )
 
 
@@ -823,6 +827,7 @@ def single_plot(
     title: str | None = None,
     datashader: bool = False,
     transform: object | None = None,
+    obs_mask: np.ndarray = None,
 ) -> None:
     """Plot a single lat-lon map.
 
@@ -877,7 +882,6 @@ def single_plot(
         lower_limit = 25
         upper_limit = 500
         n_pixels = max(min(int(np.floor(data.shape[0] * 0.004)), upper_limit), lower_limit)
-        print("-----------------NOMBRE DE PIXELS:", n_pixels)
         psc = dsshow(
             df,
             dsh.Point("x", "y"),
@@ -889,6 +893,10 @@ def single_plot(
             aspect="auto",
             ax=ax,
         )
+        if obs_mask is not None: 
+            idx, _ = np.nonzero(obs_mask)
+            ax.scatter(lon[idx],lat[idx],c='black',s=0.1)
+            
 
     if transform is not None:
         ax.set_extent([lon.min() - 0.1, lon.max() + 0.1, lat.min() - 0.1, lat.max() + 0.1], crs=transform)
@@ -907,7 +915,6 @@ def single_plot(
     ax.set_aspect("auto", adjustable=None)
     _hide_axes_ticks(ax)
     fig.colorbar(psc, ax=ax)
-
 
 def get_scatter_frame(
     ax: plt.Axes,

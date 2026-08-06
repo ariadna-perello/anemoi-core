@@ -97,18 +97,30 @@ class GraphAssim(BaseGraphModule):
             x[dataset_name] = dataset_batch[:,:self.n_step_input][...,self.data_indices[dataset_name].data.input.full]
 
             if len(x[dataset_name].shape)<5: 
-                LOGGER.info ("unsqueeze data")
+                LOGGER.info ("unsqueeze data input")
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
             LOGGER.info(f"Shape : {x[dataset_name].shape}  for {dataset_name}")
 
 
         y_pred = self(x)
+        #print("SHAPE DE Y_PRED:",y_pred[dataset_name].shape)
 
         # We take the last input 
         y = {}
         for dataset_name, dataset_batch in batch.items():
             y[dataset_name] = dataset_batch[:,-1][...,self.data_indices[dataset_name].data.output.full]
             LOGGER.info(f"Shape output : {y[dataset_name].shape}  for {dataset_name}")
+            if len(y[dataset_name].shape)<5: 
+                LOGGER.info ("unsqueeze data output")
+                y[dataset_name] = y[dataset_name].unsqueeze(2)
+
+        #print("X shape: ", x["increments_input"].shape)
+        #print("Y shape: ", y["increments_target"].shape)
+
+        #mse = ((x["increments_input"]-y["increments_target"])**2).mean()
+        #mse = torch.nn.MSELoss()(x["increments_input"],y["increments_target"])
+        #print("MSE ENTRE X ET Y:",mse)
+        #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
         loss, metrics, y_pred = checkpoint(

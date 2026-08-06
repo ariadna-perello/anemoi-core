@@ -1107,7 +1107,6 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
             The data and output tensors for plotting
         """
 
-        print("-------------------------OUTPUTS------------------",dataset_name,outputs)
         if self.latlons is None:
             self.latlons = {}
 
@@ -1124,8 +1123,6 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         # prepare input and output tensors for plotting one dataset specified by dataset_name
         total_targets = pl_module.plot_adapter.get_total_plot_targets()
 
-        print("INPUT DATA BEFORE PROCESS: ", batch[dataset_name].size())
-        print("OUTPUT DATA BEFORE PROCESS: ", outputs[1][0][dataset_name].size())
 
         input_tensor = (
             batch[dataset_name][
@@ -1139,7 +1136,6 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
         )
         
         data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
-        print("DATA--------------", data.size())
         output_tensor = torch.cat(
             tuple(
                 self.post_processors[dataset_name](x[dataset_name][:, ...].detach().cpu(), in_place=False)[
@@ -1149,7 +1145,6 @@ class BasePlotAdditionalMetrics(BasePerBatchPlotCallback):
             ),
         )
 
-        print("OUTPUT TENSOR", output_tensor.size()) 
 
         output_tensor = pl_module.plot_adapter.prepare_plot_output_tensor(output_tensor)
         output_tensor = (
@@ -1273,10 +1268,7 @@ class PlotSample(BasePlotAdditionalMetrics):
 
             
             data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
-            print("DATA--------------", data.size())
-
             data = data.numpy()
-
             return data, None
 
     @rank_zero_only
@@ -1293,6 +1285,7 @@ class PlotSample(BasePlotAdditionalMetrics):
         logger = trainer.logger
 
         print("START PLOTTING--------------------------")
+        obs_mask = None 
 
         for dataset_name in dataset_names:
             print("DATASET NAME:", dataset_name)
@@ -1314,6 +1307,9 @@ class PlotSample(BasePlotAdditionalMetrics):
                 }
     
                 data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
+                innovations, _ = self.process_forcings(pl_module, "innovations", batch)
+                innovations = innovations[0, ...].squeeze(0)
+                obs_mask = innovations.astype(bool) #True si non nul, False si nul
 
             else: 
                 print("FORCINGS---------------")
@@ -1338,8 +1334,6 @@ class PlotSample(BasePlotAdditionalMetrics):
                 data,
                 output_tensor,
             )
-            
-            print("plot_adapter:", pl_module.plot_adapter)
 
             for item in pl_module.plot_adapter.iter_plot_samples(
                 data,
@@ -1347,7 +1341,6 @@ class PlotSample(BasePlotAdditionalMetrics):
                 pl_module.plot_adapter.output_times,
                 max_out_steps=self.output_steps,
             ):  
-                print("len(item):", len(item))
 
                 if len(item) == 3:
                     x, y_pred, tag_suffix = item
@@ -1357,7 +1350,6 @@ class PlotSample(BasePlotAdditionalMetrics):
                     x, y_true, y_pred, tag_suffix = item
                     print("X, Y_TRUE, Y_PRED: ", np.shape(x), np.shape(y_true), np.shape(y_pred))
 
-                print("plot_predicted_multilevel_flat_sample------------------------")
                 fig = plot_predicted_multilevel_flat_sample(
                     plot_parameters_dict,
                     self.per_sample,
@@ -1370,10 +1362,9 @@ class PlotSample(BasePlotAdditionalMetrics):
                     precip_and_related_fields=self.precip_and_related_fields,
                     colormaps=self.colormaps,
                     projection_kind=self.projection_kind,
+                    obs_mask=obs_mask,
                 )
-                print(f"DATES for {dataset_name} dataset",trainer.datamodule.ds_valid.data[dataset_name].dates)
                 date = trainer.datamodule.ds_valid.data[dataset_name].dates[batch_idx*batch[dataset_name].shape[0]+self.sample_idx]
-                print("DATE:",date)
                 fig.suptitle(f"Date: {date}, Epoch: {epoch}")
 
                 self._output_figure(

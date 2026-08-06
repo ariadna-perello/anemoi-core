@@ -373,7 +373,6 @@ class MultiDataset(IterableDataset):
         for name, dataset in self.datasets.items():
             start, end = get_partition_range(self.shard_shapes[name], self.reader_group_rank)
             x[name] = dataset.get_sample(time_indices, slice(start, end))
-
         return x
 
     def __iter__(self) -> dict[str, torch.Tensor]:

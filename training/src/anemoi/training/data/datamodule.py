@@ -126,12 +126,13 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
         n_step_input = self.config.training.multistep_input
         n_step_output = self.config.training.multistep_output  # defaults to 1
         time_range = n_step_input + rollout * n_step_output
+        print("RELATIVE DATE INDICES SELECTED:", list(range(time_range)))
         return list(range(time_range))
 
     @cached_property
     def ds_train(self) -> MultiDataset:
         """Create multi-dataset for training."""
-        return self._get_dataset(self.train_dataloader_config, shuffle=True, label="training")
+        return self._get_dataset(self.train_dataloader_config, shuffle=False, label="training")
 
     @cached_property
     def ds_valid(self) -> MultiDataset:
@@ -166,7 +167,6 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
     def _get_dataloader(self, ds: MultiDataset, stage: str) -> DataLoader:
         """Create DataLoader for multi-dataset."""
         assert stage in {"training", "validation", "test"}
-        print(f"BATCH SIZE {stage} GET_DATALOADER:",self.config.dataloader.batch_size[stage])
         return DataLoader(
             ds,
             batch_size=self.config.dataloader.batch_size[stage],
@@ -179,14 +179,10 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Return training dataloader."""
-        ds = self._get_dataloader(self.ds_train, "training")
-        print("train dataloader batch size after init:", ds.batch_size)
         return self._get_dataloader(self.ds_train, "training")
 
     def val_dataloader(self) -> DataLoader:
         """Return validation dataloader."""
-        ds = self._get_dataloader(self.ds_valid, "validation")
-        print("val dataloader batch size after init:", ds.batch_size)
         return self._get_dataloader(self.ds_valid, "validation")
 
     def test_dataloader(self) -> DataLoader:
