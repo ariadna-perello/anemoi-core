@@ -632,7 +632,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
         dict[str, torch.Tensor]
             Computed metrics
         """
-        return self.calculate_val_metrics(y_pred, y, grid_shard_slice=grid_shard_slice, dataset_name=dataset_name)
+        return self.calculate_val_metrics(y_pred, y, grid_shard_slice=grid_shard_slice, dataset_name=dataset_name,**_kwargs)
 
     def compute_dataset_loss_metrics(
         self,
@@ -722,6 +722,8 @@ class BaseGraphModule(pl.LightningModule, ABC):
         assert isinstance(y, dict), "y must be a dict keyed by dataset name"
         # Prepare tensors for loss/metrics computation
         total_loss, metrics_next, y_preds = None, {}, {}
+        step = kwargs.get("step",None)
+
         for dataset_name in self.target_dataset_names:
             dataset_loss, dataset_metrics, y_preds[dataset_name] = self.compute_dataset_loss_metrics(
                 y_pred[dataset_name],
@@ -738,7 +740,10 @@ class BaseGraphModule(pl.LightningModule, ABC):
                 if validation_mode:
                     loss_obj = self.loss[dataset_name]
                     loss_name = getattr(loss_obj, "name", loss_obj.__class__.__name__.lower())
-                    metrics_next[f"{dataset_name}_{loss_name}_loss"] = dataset_loss
+                    if step is not None: 
+                        metrics_next[f"{dataset_name}_{loss_name}_loss/{step+1}"] = dataset_loss
+                    else: 
+                        metrics_next[f"{dataset_name}_{loss_name}_loss"] = dataset_loss
 
             # Prefix dataset name to metric keys
             for metric_name, metric_value in dataset_metrics.items():
@@ -959,7 +964,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
                     grid_dim=self.grid_dim,
                     grid_shard_shapes=self.grid_shard_shapes,
                 )
-
+        print("CALCULATE VAL METRICS DICT:", metrics.keys(),metrics.values())
         return metrics
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:

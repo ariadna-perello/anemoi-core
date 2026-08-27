@@ -893,7 +893,7 @@ def single_plot(
             aspect="auto",
             ax=ax,
         )
-        if obs_mask is not None: 
+        if obs_mask is not None and "pred" in title: 
             idx, _ = np.nonzero(obs_mask)
             ax.scatter(lon[idx],lat[idx],c='black',s=0.1)
             

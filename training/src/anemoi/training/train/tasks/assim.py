@@ -86,6 +86,7 @@ class GraphAssim(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
+        zero_locations = None
 
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
@@ -95,24 +96,34 @@ class GraphAssim(BaseGraphModule):
             self.n_step_input == list(dataset_batch.shape)[1]
         ), f"The time dimension does not correspond. Your last input step should also be in your input. So {self.n_step_input } should be equal to {list(dataset_batch.shape)[1]}."
             x[dataset_name] = dataset_batch[:,:self.n_step_input][...,self.data_indices[dataset_name].data.input.full]
-
             if len(x[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data input")
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
             LOGGER.info(f"Shape : {x[dataset_name].shape}  for {dataset_name}")
-
-
+            
+            if dataset_name == "innovations" or dataset_name == "observations": 
+                obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+                zero_locations = obs == 0
+                print("nombre de zeros dans innovations:", torch.count_nonzero(zero_locations))
+            
         y_pred = self(x)
         #print("SHAPE DE Y_PRED:",y_pred[dataset_name].shape)
 
         # We take the last input 
         y = {}
+        y_metric = {}
+        y_pred_metric = {}
+
         for dataset_name, dataset_batch in batch.items():
+            print("Y dataset name:", dataset_name)
             y[dataset_name] = dataset_batch[:,-1][...,self.data_indices[dataset_name].data.output.full]
             LOGGER.info(f"Shape output : {y[dataset_name].shape}  for {dataset_name}")
             if len(y[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data output")
                 y[dataset_name] = y[dataset_name].unsqueeze(2)
+
+            y_metric[dataset_name] = y[dataset_name].clone().detach()
+            y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
 
         #print("X shape: ", x["increments_input"].shape)
         #print("Y shape: ", y["increments_target"].shape)
@@ -123,17 +134,45 @@ class GraphAssim(BaseGraphModule):
         #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
+
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
             y_pred,
             y,
-            rollout_step=0,
+            step=0,
             training_mode=True,
             validation_mode=validation_mode,
             use_reentrant=False,
         )
 
+        for dataset_name, dataset_batch in batch.items():
+            print("Y dataset name:", dataset_name)
+            if len(self.data_indices[dataset_name].data.output.full) != 0 and zero_locations is not None: #si le dataset est en output, on applique le masque 
+                y_metric[dataset_name][zero_locations] = 0
+                y_pred_metric[dataset_name][zero_locations] = 0
+
+        print("CHECK NUMBER OF 0:")    
+        print("zero locations:", torch.count_nonzero(zero_locations))
+        print("y_metric:", torch.count_nonzero(y_metric[dataset_name]==0))
+        print("y_pred_metric:", torch.count_nonzero(y_pred_metric[dataset_name]==0))
+        
+        _, metrics_masked, _ = checkpoint(
+            self.compute_loss_metrics,
+            y_pred_metric,
+            y_metric,
+            step=1,
+            training_mode=True,
+            validation_mode=validation_mode,
+            use_reentrant=False,
+        )
+    
+        print("METRICS ASSIM:", metrics.keys(), metrics.values())
+        print("METRICS MASKED:", metrics_masked.keys(), metrics_masked.values())
+
+        metrics.update(metrics_masked)
+
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
+        print("METRICS RETURNED:",metrics.keys(), metrics.values())
         return loss, metrics, [y_pred]
 
 
