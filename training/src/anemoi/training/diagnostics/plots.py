@@ -861,6 +861,7 @@ def single_plot(
     -------
     None
     """
+    print("SINGLE PLOT OBS MASK, nb de points d'obs:", np.count_nonzero(obs_mask))
     if cmap is None:
         cmap = "viridis"
     if not datashader:

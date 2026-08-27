@@ -104,7 +104,7 @@ class GraphAssim(BaseGraphModule):
             if dataset_name == "innovations" or dataset_name == "observations": 
                 obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
                 zero_locations = obs == 0
-                print("nombre de zeros dans innovations:", torch.count_nonzero(zero_locations))
+                
             
         y_pred = self(x)
         #print("SHAPE DE Y_PRED:",y_pred[dataset_name].shape)
@@ -150,11 +150,7 @@ class GraphAssim(BaseGraphModule):
             if len(self.data_indices[dataset_name].data.output.full) != 0 and zero_locations is not None: #si le dataset est en output, on applique le masque 
                 y_metric[dataset_name][zero_locations] = 0
                 y_pred_metric[dataset_name][zero_locations] = 0
-
-        print("CHECK NUMBER OF 0:")    
-        print("zero locations:", torch.count_nonzero(zero_locations))
-        print("y_metric:", torch.count_nonzero(y_metric[dataset_name]==0))
-        print("y_pred_metric:", torch.count_nonzero(y_pred_metric[dataset_name]==0))
+                
         
         _, metrics_masked, _ = checkpoint(
             self.compute_loss_metrics,

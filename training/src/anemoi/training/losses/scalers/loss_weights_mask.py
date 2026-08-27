@@ -12,9 +12,6 @@ import logging
 
 import torch
 
-from omegaconf import DictConfig
-from omegaconf import OmegaConf
-
 from anemoi.models.interface import AnemoiModelInterface
 from anemoi.models.preprocessing import StepwiseProcessors
 from anemoi.training.losses.scalers.base_scaler import BaseUpdatingScaler

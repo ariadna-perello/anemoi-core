@@ -1308,12 +1308,12 @@ class PlotSample(BasePlotAdditionalMetrics):
 
                 data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
                 
-                if "innovations" in dataset_names: 
+                if "innovations" in self.config.data.datasets.keys(): 
                     innovations, _ = self.process_forcings(pl_module, "innovations", batch)
                     innovations = innovations[0, ...].squeeze(0)
                     obs_mask = innovations.astype(bool) #True si non nul, False si nul
 
-                    print("PLOT SAMPLE, nb obs points:", torch.count_nonzero(obs_mask))
+                    print("PLOT SAMPLE, nb obs points:", np.count_nonzero(obs_mask))
 
             else: 
                 print("FORCINGS---------------")
