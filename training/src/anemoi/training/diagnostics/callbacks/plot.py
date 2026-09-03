@@ -1307,12 +1307,18 @@ class PlotSample(BasePlotAdditionalMetrics):
                 }
 
                 data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
-                
+
+                if "observations" in self.config.data.datasets.keys(): 
+                    observations, _ = self.process_forcings(pl_module, "observations", batch)
+                    observations = observations[0, ...].squeeze(0)
+                    obs_mask = ~np.isnan(observations) #True si valeur, False si NaN
+
                 if "innovations" in self.config.data.datasets.keys(): 
                     innovations, _ = self.process_forcings(pl_module, "innovations", batch)
                     innovations = innovations[0, ...].squeeze(0)
                     obs_mask = innovations.astype(bool) #True si non nul, False si nul
 
+                if obs_mask is not None: 
                     print("PLOT SAMPLE, nb obs points:", np.count_nonzero(obs_mask))
 
             else: 
@@ -1478,6 +1484,8 @@ class PlotSpectrum(BasePlotAdditionalMetrics):
                     y_true = None
                 else:
                     x, y_true, y_pred, tag_suffix = item
+
+                print("PLOT SPECTRUM STARTS")
                 fig = plot_power_spectrum(
                     plot_parameters_dict_spectrum,
                     latlons,

@@ -101,9 +101,14 @@ class GraphAssim(BaseGraphModule):
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
             LOGGER.info(f"Shape : {x[dataset_name].shape}  for {dataset_name}")
             
-            if dataset_name == "innovations" or dataset_name == "observations": 
+            if dataset_name == "innovations": 
+                innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+                zero_locations = innovations == 0
+
+            if dataset_name == "observations": 
                 obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                zero_locations = obs == 0
+                zero_locations = torch.isnan(obs)
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(zero_locations))
                 
             
         y_pred = self(x)
