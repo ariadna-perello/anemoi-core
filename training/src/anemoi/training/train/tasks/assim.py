@@ -100,6 +100,9 @@ class GraphAssim(BaseGraphModule):
                 LOGGER.info ("unsqueeze data input")
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
             LOGGER.info(f"Shape : {x[dataset_name].shape}  for {dataset_name}")
+
+            if validation_mode: 
+                print(dataset_name, "X, number of nans:", torch.count_nonzero(torch.isnan(x[dataset_name])))
             
             if dataset_name == "innovations": 
                 innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
@@ -126,6 +129,9 @@ class GraphAssim(BaseGraphModule):
             if len(y[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data output")
                 y[dataset_name] = y[dataset_name].unsqueeze(2)
+            if validation_mode: 
+                print(dataset_name, "Y, number of nans:", torch.count_nonzero(torch.isnan(y[dataset_name])))
+                print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
 
             y_metric[dataset_name] = y[dataset_name].clone().detach()
             y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
@@ -166,14 +172,13 @@ class GraphAssim(BaseGraphModule):
             validation_mode=validation_mode,
             use_reentrant=False,
         )
-    
-        print("METRICS ASSIM:", metrics.keys(), metrics.values())
-        print("METRICS MASKED:", metrics_masked.keys(), metrics_masked.values())
 
         metrics.update(metrics_masked)
 
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
-        print("METRICS RETURNED:",metrics.keys(), metrics.values())
+        if validation_mode: 
+            print("VALIDATION MODE")
+            print("METRICS RETURNED:",metrics.keys(), metrics.values())
         return loss, metrics, [y_pred]
 
 

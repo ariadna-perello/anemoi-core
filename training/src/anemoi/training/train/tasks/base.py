@@ -1003,19 +1003,17 @@ class BaseGraphModule(pl.LightningModule, ABC):
         batch_idx : int
             Batch inces
         """
+        print("BATCH INDEX:", batch_idx)
         del batch_idx
         assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
-
-        print("COMPUTE VAL LOSS")
 
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
 
-        print("BATCH SIZE VALIDATION:",batch_size)
-
         with torch.no_grad():
             val_loss_scales, metrics, *args = self._step(batch, validation_mode=True)
         val_loss = val_loss_scales.sum()
+        print("VAL LOSS:", val_loss)
 
         self.log(
             "val_" + self._get_loss_name() + "_loss",
