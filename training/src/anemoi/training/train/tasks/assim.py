@@ -184,16 +184,17 @@ class GraphAssim(BaseGraphModule):
 
     def on_train_epoch_start(self): 
         self.epoch_start_time = time.time()
-
+    '''
     def on_train_epoch_end(self) -> None:
         duration = time.time() - self.epoch_start_time
         self.epoch_durations.append(duration)
         LOGGER.info(f"Epoch duration : {duration}")
         self.log("epoch_duration",duration,on_epoch=True, on_step=False, prog_bar=False, logger=self.logger_enabled,)
+    
 
     def on_train_end(self):
         if self.epoch_durations:
             avg = sum(self.epoch_durations) / len(self.epoch_durations)
             LOGGER.info(f"Mean duration of an epoch : {avg:.2f}s")
 
-
+    '''
