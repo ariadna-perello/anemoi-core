@@ -81,20 +81,20 @@ class GraphAssim(BaseGraphModule):
         self.obs_mask = None
 
     def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
-    """Override to compute observation mask before scaler updates."""
-    
-    for dataset_name, dataset_batch in batch.items():
-        if dataset_name == "innovations": 
-            innovations = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-            self.obs_mask = innovations == 0
-            print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+        """Override to compute observation mask before scaler updates."""
+        
+        for dataset_name, dataset_batch in batch.items():
+            if dataset_name == "innovations": 
+                innovations = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
+                self.obs_mask = innovations == 0
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
 
-        if dataset_name == "observations": 
-            obs = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-            self.obs_mask = torch.isnan(obs)
-            print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
-    
-    return super().on_after_batch_transfer(batch, _)
+            if dataset_name == "observations": 
+                obs = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
+                self.obs_mask = torch.isnan(obs)
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+        
+        return super().on_after_batch_transfer(batch, _)
 
     def update_scalers(self, callback: AvailableCallbacks) -> None:
         """Update scalers, calling the defined function on them, updating if not None."""
