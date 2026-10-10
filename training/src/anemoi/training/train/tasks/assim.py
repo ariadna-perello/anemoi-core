@@ -98,7 +98,7 @@ class GraphAssim(BaseGraphModule):
         
         return super().on_after_batch_transfer(batch, _)
     
-
+    '''
     def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
         """Assemble batch after transfer to GPU by gathering the batch shards if needed.
 
@@ -136,7 +136,7 @@ class GraphAssim(BaseGraphModule):
         self._prepare_loss_scalers()
 
         return super().on_after_batch_transfer(batch, _)
-
+    '''
     def update_scalers(self, callback: AvailableCallbacks) -> None:
         """Update scalers, calling the defined function on them, updating if not None."""
         print("UPDATE SCALERS OBS MASK:", self.obs_mask)
