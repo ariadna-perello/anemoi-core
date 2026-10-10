@@ -180,33 +180,20 @@ class GraphAssim(BaseGraphModule):
             if validation_mode: 
                 print(dataset_name, "X, number of nans:", torch.count_nonzero(torch.isnan(x[dataset_name])))
             
-            if dataset_name == "innovations": 
-                innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                self.obs_mask = innovations == 0
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+            #if dataset_name == "innovations": 
+            #    innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+            #    self.obs_mask = innovations == 0
+            #    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
 
-            if dataset_name == "observations": 
-                obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                self.obs_mask = torch.isnan(obs)
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+            #if dataset_name == "observations": 
+            #    obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+            #    self.obs_mask = torch.isnan(obs)
+            #    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
                 
             
         y_pred = self(x)
         #print("SHAPE DE Y_PRED:",y_pred[dataset_name].shape)
 
-        # We take the last input 
-        y = {}
-
-        for dataset_name, dataset_batch in batch.items():
-            print("Y dataset name:", dataset_name)
-            y[dataset_name] = dataset_batch[:,-1][...,self.data_indices[dataset_name].data.output.full]
-            LOGGER.info(f"Shape output : {y[dataset_name].shape}  for {dataset_name}")
-            if len(y[dataset_name].shape)<5: 
-                LOGGER.info ("unsqueeze data output")
-                y[dataset_name] = y[dataset_name].unsqueeze(2)
-            if validation_mode: 
-                print(dataset_name, "Y, number of nans:", torch.count_nonzero(torch.isnan(y[dataset_name])))
-                print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
 
         #print("X shape: ", x["increments_input"].shape)
         #print("Y shape: ", y["increments_target"].shape)
@@ -217,6 +204,26 @@ class GraphAssim(BaseGraphModule):
         #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
+
+
+        y = {}
+        y_metric = {}
+        y_pred_metric = {}
+
+        for dataset_name, dataset_batch in batch.items():
+            print("Y dataset name:", dataset_name)
+            y[dataset_name] = dataset_batch[:,-1][...,self.data_indices[dataset_name].data.output.full]
+            LOGGER.info(f"Shape output : {y[dataset_name].shape}  for {dataset_name}")
+            if len(y[dataset_name].shape)<5: 
+                LOGGER.info ("unsqueeze data output")
+                y[dataset_name] = y[dataset_name].unsqueeze(2)
+
+            y_metric[dataset_name] = y[dataset_name].clone().detach()
+            y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
+            if validation_mode: 
+                print(dataset_name, "Y, number of nans:", torch.count_nonzero(torch.isnan(y[dataset_name])))
+                print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
+
 
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
@@ -229,12 +236,8 @@ class GraphAssim(BaseGraphModule):
         )
 
         if validation_mode and self.obs_mask is not None: 
-            y_metric = {}
-            y_pred_metric = {}
             for dataset_name, dataset_batch in batch.items():
                 print("Y dataset name:", dataset_name)
-                y_metric[dataset_name] = y[dataset_name].clone().detach()
-                y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
                 y_metric[dataset_name][self.obs_mask] = 0
                 y_pred_metric[dataset_name][self.obs_mask] = 0
                     
