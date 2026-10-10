@@ -238,8 +238,9 @@ class GraphAssim(BaseGraphModule):
         if validation_mode and self.obs_mask is not None: 
             for dataset_name, dataset_batch in batch.items():
                 print("Y dataset name:", dataset_name)
-                y_metric[dataset_name][self.obs_mask] = 0
-                y_pred_metric[dataset_name][self.obs_mask] = 0
+                if len(self.data_indices[dataset_name].data.output.full) != 0
+                    y_metric[dataset_name][self.obs_mask] = 0
+                    y_pred_metric[dataset_name][self.obs_mask] = 0
                     
             
             _, metrics_masked, _ = checkpoint(
