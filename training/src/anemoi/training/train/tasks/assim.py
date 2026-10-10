@@ -97,7 +97,7 @@ class GraphAssim(BaseGraphModule):
                 print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
         
         return super().on_after_batch_transfer(batch, _)
-    '''
+    
 
     def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
         """Assemble batch after transfer to GPU by gathering the batch shards if needed.
@@ -154,8 +154,7 @@ class GraphAssim(BaseGraphModule):
                     dataset_name=dataset_name,
                 )
 
-
-    '''
+        
     def _step(
         self,
         batch: dict[str, torch.Tensor],
