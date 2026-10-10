@@ -80,6 +80,8 @@ class GraphAssim(BaseGraphModule):
         self._plot_adapter = AssimilationPlotAdapter(self)
         self.obs_mask = None
 
+    '''
+
     def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
         """Override to compute observation mask before scaler updates."""
         
@@ -94,6 +96,45 @@ class GraphAssim(BaseGraphModule):
                 self.obs_mask = torch.isnan(obs)
                 print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
         
+        return super().on_after_batch_transfer(batch, _)
+    '''
+
+    def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
+        """Assemble batch after transfer to GPU by gathering the batch shards if needed.
+
+        Also normalize the batch in-place if needed.
+
+        Parameters
+        ----------
+        batch : dict[str, torch.Tensor]
+            Batch to transfer
+
+        Returns
+        -------
+        dict[str, torch.Tensor]
+            Batch after transfer
+        """
+        assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
+        # Gathering/sharding of batch
+        batch = self._setup_batch_sharding(batch)
+
+        # Batch normalization
+        batch = self._normalize_batch(batch)
+
+        for dataset_name, dataset_batch in batch.items():
+            if dataset_name == "innovations": 
+                innovations = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
+                self.obs_mask = innovations == 0
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+
+            if dataset_name == "observations": 
+                obs = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
+                self.obs_mask = torch.isnan(obs)
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+
+        # Prepare scalers, e.g. init delayed scalers and update scalers
+        self._prepare_loss_scalers()
+
         return super().on_after_batch_transfer(batch, _)
 
     def update_scalers(self, callback: AvailableCallbacks) -> None:
