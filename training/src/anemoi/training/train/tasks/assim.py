@@ -80,25 +80,6 @@ class GraphAssim(BaseGraphModule):
         self._plot_adapter = AssimilationPlotAdapter(self)
         self.obs_mask = None
 
-    '''
-
-    def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
-        """Override to compute observation mask before scaler updates."""
-        
-        for dataset_name, dataset_batch in batch.items():
-            if dataset_name == "innovations": 
-                innovations = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-                self.obs_mask = innovations == 0
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
-
-            if dataset_name == "observations": 
-                obs = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-                self.obs_mask = torch.isnan(obs)
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
-        
-        return super().on_after_batch_transfer(batch, _)
-    
-    '''
     def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
         """Assemble batch after transfer to GPU by gathering the batch shards if needed.
 
@@ -137,7 +118,7 @@ class GraphAssim(BaseGraphModule):
 
         #return super().on_after_batch_transfer(batch, _)
         return batch 
-    '''
+    
     def update_scalers(self, callback: AvailableCallbacks) -> None:
         """Update scalers, calling the defined function on them, updating if not None."""
         print("UPDATE SCALERS OBS MASK:", self.obs_mask)
@@ -260,8 +241,9 @@ class GraphAssim(BaseGraphModule):
             print("VALIDATION MODE")
             print("METRICS RETURNED:",metrics.keys(), metrics.values())
         return loss, metrics, [y_pred]
-    '''
+    
 
+    '''
     def _step(
         self,
         batch: dict[str, torch.Tensor],
@@ -358,6 +340,7 @@ class GraphAssim(BaseGraphModule):
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
         print("METRICS RETURNED:",metrics.keys(), metrics.values())
         return loss, metrics, [y_pred]
+    '''
 
     def on_train_epoch_start(self): 
         self.epoch_start_time = time.time()
