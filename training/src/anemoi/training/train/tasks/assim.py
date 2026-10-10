@@ -135,7 +135,8 @@ class GraphAssim(BaseGraphModule):
         # Prepare scalers, e.g. init delayed scalers and update scalers
         self._prepare_loss_scalers()
 
-        return super().on_after_batch_transfer(batch, _)
+        #return super().on_after_batch_transfer(batch, _)
+        return batch 
     '''
     def update_scalers(self, callback: AvailableCallbacks) -> None:
         """Update scalers, calling the defined function on them, updating if not None."""
