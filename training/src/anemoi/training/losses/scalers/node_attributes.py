@@ -136,18 +136,23 @@ class ObsMaskGraphNodeAttributeScaler(GraphNodeAttributeScaler):
         norm: str | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(norm=norm)
-        del kwargs
-        self.output_mask = output_mask if output_mask is not None else NoOutputMask()
-        self.nodes = graph_data[nodes_name]
-        self.nodes_attribute_name = nodes_attribute_name
-        self.inverse = inverse
+        super().__init__(
+            graph_data=graph_data,
+            nodes_name=nodes_name,
+            nodes_attribute_name=nodes_attribute_name,
+            output_mask=output_mask,
+            inverse=inverse,
+            norm=norm,
+            **kwargs,
+        )
         self._obs_mask = None
 
     def get_scaling_values(self) -> torch.Tensor:
         scaler_values = self.nodes[self.nodes_attribute_name].squeeze()
+        print("SCALER VALUES DIMS:", scaler_values.shape)
         scaler_values = ~scaler_values if self.inverse else scaler_values
-        self._obs_mask.apply(scaler_values, dim=0, fill_value=0.0)
+        if self._obs_mask is not None: 
+            scaler_values[self._obs_mask] = 0
         return self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)
     
     def set_obs_mask(self, obs_mask: torch.Tensor) -> None:

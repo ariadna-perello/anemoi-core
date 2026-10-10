@@ -84,6 +84,6 @@ class NaNMaskScaler(BaseUpdatingScaler):
                         loss_weights_mask = loss_weights_mask * pre_processor.loss_mask_training
 
         return loss_weights_mask
-    
+
 
     
