@@ -236,6 +236,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
                 metadata_variables=metadata["dataset"][dataset_name].get("variables_metadata"),
             )
 
+
             dataset_scalers, dataset_updating_scalars = create_scalers(
                 scalers_configs[dataset_name],
                 data_indices=data_indices[dataset_name],
@@ -395,6 +396,12 @@ class BaseGraphModule(pl.LightningModule, ABC):
         scalers: dict,
         data_indices: IndexCollection,
     ) -> torch.nn.ModuleDict:
+
+        print("BUILD METRIC FOR DATASET")
+        for metric_name, val_metric_config in validation_metrics_configs.items(): 
+            print(metric_name)
+            get_loss_function(val_metric_config, scalers=scalers, data_indices=data_indices)
+
         return torch.nn.ModuleDict(
             {
                 metric_name: get_loss_function(val_metric_config, scalers=scalers, data_indices=data_indices)
@@ -601,6 +608,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
         torch.Tensor
             Computed loss
         """
+        print("COMPUTE LOSS")
         return self.loss[dataset_name](
             y_pred,
             y,
@@ -741,12 +749,18 @@ class BaseGraphModule(pl.LightningModule, ABC):
                     loss_obj = self.loss[dataset_name]
                     loss_name = getattr(loss_obj, "name", loss_obj.__class__.__name__.lower())
                     if step is not None: 
+                        print("LOSSES:")
+                        print(f"{dataset_name}_{loss_name}_loss/{step+1}")
                         metrics_next[f"{dataset_name}_{loss_name}_loss/{step+1}"] = dataset_loss
                     else: 
+                        print("LOSSES:")
+                        print(f"{dataset_name}_{loss_name}_loss")
                         metrics_next[f"{dataset_name}_{loss_name}_loss"] = dataset_loss
 
             # Prefix dataset name to metric keys
             for metric_name, metric_value in dataset_metrics.items():
+                print("METRICS:")
+                print(f"{dataset_name}_{metric_name}")
                 metrics_next[f"{dataset_name}_{metric_name}"] = metric_value
 
         return total_loss, metrics_next, y_preds
@@ -973,10 +987,9 @@ class BaseGraphModule(pl.LightningModule, ABC):
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
         batch_shape = next(iter(batch.values())).shape
-        print("BATCH SHAPE TRAINING STEP:",batch_shape)
 
         #((x["increments_input"]-x["increments_target"])**2).mean()
-
+        print("TRAINING STEP LOSS COMPUTATION:")
         train_loss, *_ = self._step(batch)
         train_loss = train_loss.sum()
 
@@ -1009,6 +1022,8 @@ class BaseGraphModule(pl.LightningModule, ABC):
 
         # Get batch size (handle dict of tensors)
         batch_size = next(iter(batch.values())).shape[0]
+
+        print("VALIDATION STEP LOSS COMPUTATION:")
 
         with torch.no_grad():
             val_loss_scales, metrics, *args = self._step(batch, validation_mode=True)

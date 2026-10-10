@@ -119,3 +119,37 @@ class ReweightedGraphNodeAttributeScaler(GraphNodeAttributeScaler):
     def get_scaling_values(self, **kwargs) -> torch.Tensor:
         attribute_values = super().get_scaling_values(**kwargs)
         return self.reweight_attribute_values(attribute_values)
+
+
+class ObsMaskGraphNodeAttributeScaler(GraphNodeAttributeScaler):
+    """Class for extracting scalers from node attributes. If there is an obs_mask, masked values are removed from normalisation computation."""
+
+    scale_dims: TensorDim = TensorDim.GRID
+
+    def __init__(
+        self,
+        graph_data: HeteroData,
+        nodes_name: str,
+        nodes_attribute_name: str | None = None,
+        output_mask: type[BaseMask] | None = None,
+        inverse: bool = False,
+        norm: str | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(norm=norm)
+        del kwargs
+        self.output_mask = output_mask if output_mask is not None else NoOutputMask()
+        self.nodes = graph_data[nodes_name]
+        self.nodes_attribute_name = nodes_attribute_name
+        self.inverse = inverse
+        self._obs_mask = None
+
+    def get_scaling_values(self) -> torch.Tensor:
+        scaler_values = self.nodes[self.nodes_attribute_name].squeeze()
+        scaler_values = ~scaler_values if self.inverse else scaler_values
+        self._obs_mask.apply(scaler_values, dim=0, fill_value=0.0)
+        return self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)
+    
+    def set_obs_mask(self, obs_mask: torch.Tensor) -> None:
+        """Directly set the observation mask."""
+        self._obs_mask = obs_mask

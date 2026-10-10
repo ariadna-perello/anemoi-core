@@ -95,6 +95,7 @@ def _apply_scalers(
 ) -> None:
     """Attach scalers to a loss function and set data indices if needed."""
     for key in scalers_to_include:
+        print("SCALER ADDED:", key)
         if key not in scalers or []:
             error_msg = f"Scaler {key!r} not found in valid scalers: {list(scalers.keys())}"
             raise ValueError(error_msg)
@@ -116,9 +117,11 @@ def get_metric_ranges(
     output_data_indices: OutputTensorIndex,
     metrics_to_log: list,
 ) -> METRIC_RANGE_DTYPE:
+    print("GET METRIC RANGES")
     metric_ranges = defaultdict(list)
 
     for key, idx in output_data_indices.name_to_index.items():
+        print("VARIABLE", key)
         variable_group, variable_ref, _ = extract_variable_group_and_level.get_group_and_level(key)
 
         # Add metrics for grouped variables and variables in default group

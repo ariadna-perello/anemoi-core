@@ -237,4 +237,8 @@ class ExtractVariableGroupAndLevel:
             Variable level, i.e. pressure level or model level.
             If variable_name cannot be split, will be None.
         """
+        print("VARIABLE TRAITÉE:", variable_name )
+        print("groupe:",self.get_group(variable_name))
+        print("param:", self.get_param(variable_name))
+        print("level:", self.get_level(variable_name))     
         return self.get_group(variable_name), self.get_param(variable_name), self.get_level(variable_name)

@@ -56,6 +56,7 @@ class BaseScaler(ABC):
             return values
 
         if self.norm.lower() in ["l1", "unit-sum"]:
+            print("COEFF DE NORMALISATION:", torch.sum(values))
             return values / torch.sum(values)
 
         if self.norm.lower() == "unit-mean":

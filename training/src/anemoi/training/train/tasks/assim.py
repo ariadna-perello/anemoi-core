@@ -17,7 +17,9 @@ from torch.utils.checkpoint import checkpoint
 
 from anemoi.training.diagnostics.callbacks.plot_adapter import AssimilationPlotAdapter
 from anemoi.training.train.tasks.base import BaseGraphModule
-
+from anemoi.training.losses.scalers.node_attributes import ObsMaskGraphNodeAttributeScaler
+from anemoi.training.losses.scalers.base_scaler import AvailableCallbacks
+ 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -76,6 +78,23 @@ class GraphAssim(BaseGraphModule):
         )
 
         self._plot_adapter = AssimilationPlotAdapter(self)
+        self.obs_mask = None
+
+    def update_scalers(self, callback: AvailableCallbacks) -> None:
+        """Update scalers, calling the defined function on them, updating if not None."""
+        # Multi-dataset case: {'dataset_a': {'nan_mask_weights': scaler, ...}, 'dataset_b': {...}}
+        for dataset_name, dataset_scalers in self.updating_scalars.items():
+            for name, scaler_builder in dataset_scalers.items():
+                if isinstance(scaler_builder, ObsMaskGraphNodeAttributeScaler):
+                    scaler_builder.set_obs_mask(self.obs_mask)
+                self._update_scaler_for_dataset(
+                    name,
+                    scaler_builder,
+                    callback,
+                    self.loss[dataset_name],
+                    self.metrics[dataset_name],
+                    dataset_name=dataset_name,
+                )
 
 
 
@@ -86,7 +105,6 @@ class GraphAssim(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
-        zero_locations = None
 
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
@@ -106,12 +124,13 @@ class GraphAssim(BaseGraphModule):
             
             if dataset_name == "innovations": 
                 innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                zero_locations = innovations == 0
+                self.obs_mask = innovations == 0
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
 
             if dataset_name == "observations": 
                 obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                zero_locations = torch.isnan(obs)
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(zero_locations))
+                self.obs_mask = torch.isnan(obs)
+                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
                 
             
         y_pred = self(x)
@@ -119,8 +138,6 @@ class GraphAssim(BaseGraphModule):
 
         # We take the last input 
         y = {}
-        y_metric = {}
-        y_pred_metric = {}
 
         for dataset_name, dataset_batch in batch.items():
             print("Y dataset name:", dataset_name)
@@ -132,9 +149,6 @@ class GraphAssim(BaseGraphModule):
             if validation_mode: 
                 print(dataset_name, "Y, number of nans:", torch.count_nonzero(torch.isnan(y[dataset_name])))
                 print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
-
-            y_metric[dataset_name] = y[dataset_name].clone().detach()
-            y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
 
         #print("X shape: ", x["increments_input"].shape)
         #print("Y shape: ", y["increments_target"].shape)
@@ -156,24 +170,28 @@ class GraphAssim(BaseGraphModule):
             use_reentrant=False,
         )
 
-        for dataset_name, dataset_batch in batch.items():
-            print("Y dataset name:", dataset_name)
-            if len(self.data_indices[dataset_name].data.output.full) != 0 and zero_locations is not None: #si le dataset est en output, on applique le masque 
-                y_metric[dataset_name][zero_locations] = 0
-                y_pred_metric[dataset_name][zero_locations] = 0
-                
-        
-        _, metrics_masked, _ = checkpoint(
-            self.compute_loss_metrics,
-            y_pred_metric,
-            y_metric,
-            step=1,
-            training_mode=True,
-            validation_mode=validation_mode,
-            use_reentrant=False,
-        )
+        if validation_mode and self.obs_mask is not None: 
+            y_metric = {}
+            y_pred_metric = {}
+            for dataset_name, dataset_batch in batch.items():
+                print("Y dataset name:", dataset_name)
+                y_metric[dataset_name] = y[dataset_name].clone().detach()
+                y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
+                y_metric[dataset_name][self.obs_mask] = 0
+                y_pred_metric[dataset_name][self.obs_mask] = 0
+                    
+            
+            _, metrics_masked, _ = checkpoint(
+                self.compute_loss_metrics,
+                y_pred_metric,
+                y_metric,
+                step=1,
+                training_mode=True,
+                validation_mode=validation_mode,
+                use_reentrant=False,
+            )
 
-        metrics.update(metrics_masked)
+            metrics.update(metrics_masked)
 
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
         if validation_mode: 
@@ -184,7 +202,7 @@ class GraphAssim(BaseGraphModule):
 
     def on_train_epoch_start(self): 
         self.epoch_start_time = time.time()
-    '''
+    
     def on_train_epoch_end(self) -> None:
         duration = time.time() - self.epoch_start_time
         self.epoch_durations.append(duration)
@@ -197,4 +215,4 @@ class GraphAssim(BaseGraphModule):
             avg = sum(self.epoch_durations) / len(self.epoch_durations)
             LOGGER.info(f"Mean duration of an epoch : {avg:.2f}s")
 
-    '''
+    
