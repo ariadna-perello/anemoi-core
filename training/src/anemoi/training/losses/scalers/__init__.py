@@ -11,7 +11,6 @@ from .base_scaler import TensorDim
 from .loss_weights_mask import NaNMaskScaler
 from .node_attributes import GraphNodeAttributeScaler
 from .node_attributes import ReweightedGraphNodeAttributeScaler
-from .node_attributes import ObsMaskGraphNodeAttributeScaler
 from .scalers import create_scalers
 from .time_step import LeadTimeDecayScaler
 from .time_step import TimeStepScaler
@@ -37,7 +36,6 @@ __all__ = [
     "PolynomialVariableLevelScaler",
     "ReluVariableLevelScaler",
     "ReweightedGraphNodeAttributeScaler",
-    "ObsMaskGraphNodeAttributeScaler"
     "StdevTendencyScaler",
     "TensorDim",
     "TimeStepScaler",

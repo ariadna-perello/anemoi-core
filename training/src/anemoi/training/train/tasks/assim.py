@@ -17,8 +17,6 @@ from torch.utils.checkpoint import checkpoint
 
 from anemoi.training.diagnostics.callbacks.plot_adapter import AssimilationPlotAdapter
 from anemoi.training.train.tasks.base import BaseGraphModule
-from anemoi.training.losses.scalers.node_attributes import ObsMaskGraphNodeAttributeScaler
-from anemoi.training.losses.scalers.base_scaler import AvailableCallbacks
  
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -78,65 +76,8 @@ class GraphAssim(BaseGraphModule):
         )
 
         self._plot_adapter = AssimilationPlotAdapter(self)
-        self.obs_mask = None
 
-    def on_after_batch_transfer(self, batch: dict[str, torch.Tensor], _: int) -> dict[str, torch.Tensor]:
-        """Assemble batch after transfer to GPU by gathering the batch shards if needed.
 
-        Also normalize the batch in-place if needed.
-
-        Parameters
-        ----------
-        batch : dict[str, torch.Tensor]
-            Batch to transfer
-
-        Returns
-        -------
-        dict[str, torch.Tensor]
-            Batch after transfer
-        """
-        assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
-        # Gathering/sharding of batch
-        batch = self._setup_batch_sharding(batch)
-
-        # Batch normalization
-        batch = self._normalize_batch(batch)
-
-        for dataset_name, dataset_batch in batch.items():
-            if dataset_name == "innovations": 
-                innovations = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-                self.obs_mask = innovations == 0
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
-
-            if dataset_name == "observations": 
-                obs = self.model.post_processors[dataset_name](dataset_batch[:,:,:self.n_step_input],in_place=False)
-                self.obs_mask = torch.isnan(obs)
-                print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
-
-        # Prepare scalers, e.g. init delayed scalers and update scalers
-        self._prepare_loss_scalers()
-
-        #return super().on_after_batch_transfer(batch, _)
-        return batch 
-    
-    def update_scalers(self, callback: AvailableCallbacks) -> None:
-        """Update scalers, calling the defined function on them, updating if not None."""
-        print("UPDATE SCALERS OBS MASK:", self.obs_mask)
-        for dataset_name, dataset_scalers in self.updating_scalars.items():
-            for name, scaler_builder in dataset_scalers.items():
-                if isinstance(scaler_builder, ObsMaskGraphNodeAttributeScaler):
-                    if self.obs_mask is not None: 
-                        scaler_builder.set_obs_mask(self.obs_mask)
-                self._update_scaler_for_dataset(
-                    name,
-                    scaler_builder,
-                    callback,
-                    self.loss[dataset_name],
-                    self.metrics[dataset_name],
-                    dataset_name=dataset_name,
-                )
-
-        
     def _step(
         self,
         batch: dict[str, torch.Tensor],
@@ -144,6 +85,7 @@ class GraphAssim(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
+        obs_zeros = None
 
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
@@ -160,33 +102,21 @@ class GraphAssim(BaseGraphModule):
 
             if validation_mode: 
                 print(dataset_name, "X, number of nans:", torch.count_nonzero(torch.isnan(x[dataset_name])))
-            
-            #if dataset_name == "innovations": 
-            #    innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-            #    self.obs_mask = innovations == 0
-            #    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+                if dataset_name == "innovations": 
+                    innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+                    obs_zeros = innovations == 0
+                    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
 
-            #if dataset_name == "observations": 
-            #    obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-            #    self.obs_mask = torch.isnan(obs)
-            #    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~self.obs_mask))
+                if dataset_name == "observations": 
+                    obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+                    obs_zeros = torch.isnan(obs)
+                    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
                 
             
         y_pred = self(x)
         #print("SHAPE DE Y_PRED:",y_pred[dataset_name].shape)
 
-
-        #print("X shape: ", x["increments_input"].shape)
-        #print("Y shape: ", y["increments_target"].shape)
-
-        #mse = ((x["increments_input"]-y["increments_target"])**2).mean()
-        #mse = torch.nn.MSELoss()(x["increments_input"],y["increments_target"])
-        #print("MSE ENTRE X ET Y:",mse)
-        #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
-
-        # y includes the auxiliary variables, so we must leave those out when computing the loss
-
-
+        # We take the last input 
         y = {}
         y_metric = {}
         y_pred_metric = {}
@@ -198,13 +128,21 @@ class GraphAssim(BaseGraphModule):
             if len(y[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data output")
                 y[dataset_name] = y[dataset_name].unsqueeze(2)
-
-            y_metric[dataset_name] = y[dataset_name].clone().detach()
-            y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
             if validation_mode: 
                 print(dataset_name, "Y, number of nans:", torch.count_nonzero(torch.isnan(y[dataset_name])))
                 print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
+                y_metric[dataset_name] = y[dataset_name].clone().detach()
+                y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
 
+        #print("X shape: ", x["increments_input"].shape)
+        #print("Y shape: ", y["increments_target"].shape)
+
+        #mse = ((x["increments_input"]-y["increments_target"])**2).mean()
+        #mse = torch.nn.MSELoss()(x["increments_input"],y["increments_target"])
+        #print("MSE ENTRE X ET Y:",mse)
+        #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
+
+        # y includes the auxiliary variables, so we must leave those out when computing the loss
 
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
@@ -216,12 +154,12 @@ class GraphAssim(BaseGraphModule):
             use_reentrant=False,
         )
 
-        if validation_mode and self.obs_mask is not None: 
+        if validation_mode and obs_zeros is not None: 
             for dataset_name, dataset_batch in batch.items():
                 print("Y dataset name:", dataset_name)
-                if len(self.data_indices[dataset_name].data.output.full) != 0: 
-                    y_metric[dataset_name][self.obs_mask] = 0
-                    y_pred_metric[dataset_name][self.obs_mask] = 0
+                if len(self.data_indices[dataset_name].data.output.full) != 0: #si le dataset est en output, on applique le masque: 
+                    y_metric[dataset_name][obs_zeros] = 0
+                    y_pred_metric[dataset_name][obs_zeros] = 0
                     
             
             _, metrics_masked, _ = checkpoint(
@@ -241,7 +179,8 @@ class GraphAssim(BaseGraphModule):
             print("VALIDATION MODE")
             print("METRICS RETURNED:",metrics.keys(), metrics.values())
         return loss, metrics, [y_pred]
-    
+
+
     def on_train_epoch_start(self): 
         self.epoch_start_time = time.time()
     

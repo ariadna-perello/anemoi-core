@@ -184,14 +184,6 @@ class GraphNodeAttributeScalerSchema(BaseModel):
     norm: Literal["unit-max", "unit-sum"] | None = Field(example="unit-sum")
     "Normalisation method applied to the node attribute."
 
-class ObsMaskGraphNodeAttributeScalerSchema(BaseModel):
-    target_: Literal["anemoi.training.losses.scalers.ObsMaskGraphNodeAttributeScaler"] = Field(..., alias="_target_")
-    nodes_attribute_name: str = Field(example="area_weight")
-    "Name of the node attribute to return."
-    norm: Literal["unit-max", "unit-sum"] | None = Field(example="unit-sum")
-    "Normalisation method applied to the node attribute."
-
-
 class TimeStepScalerSchema(BaseModel):
     target_: Literal["anemoi.training.losses.scalers.TimeStepScaler"] = Field(..., alias="_target_")
     norm: Literal["unit-max", "unit-sum"] | None = Field(default="unit-sum", example="unit-sum")
@@ -249,7 +241,6 @@ ScalerSchema = (
     | UniformTimeStepScalerSchema
     | LeadTimeDecayScalerSchema
     | ReweightedGraphNodeAttributeScalerSchema
-    | ObsMaskGraphNodeAttributeScalerSchema
 )
 
 
