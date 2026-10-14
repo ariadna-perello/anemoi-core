@@ -85,7 +85,7 @@ class GraphAssim(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
-        obs_zeros = None
+        #obs_zeros = None
 
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
@@ -100,18 +100,18 @@ class GraphAssim(BaseGraphModule):
                 x[dataset_name] = x[dataset_name].unsqueeze(2)
             LOGGER.info(f"Shape : {x[dataset_name].shape}  for {dataset_name}")
 
-            if validation_mode: 
-                print(dataset_name, "X, number of nans:", torch.count_nonzero(torch.isnan(x[dataset_name])))
-                if dataset_name == "innovations": 
-                    innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                    obs_zeros = innovations == 0
-                    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
+            #if validation_mode: 
+            #    print(dataset_name, "X, number of nans:", torch.count_nonzero(torch.isnan(x[dataset_name])))
+            #    if dataset_name == "innovations": 
+            #        innovations = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+            #        obs_zeros = innovations == 0
+            #        print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
 
-                if dataset_name == "observations": 
-                    obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
-                    obs_zeros = torch.isnan(obs)
-                    print("DEVICE OBS ZEROS:", obs_zeros.get_device())
-                    print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
+            #   if dataset_name == "observations": 
+            #        obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
+            #        obs_zeros = torch.isnan(obs)
+            #        print("DEVICE OBS ZEROS:", obs_zeros.get_device())
+            #        print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
                 
             
         y_pred = self(x)
