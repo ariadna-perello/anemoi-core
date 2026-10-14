@@ -110,6 +110,7 @@ class GraphAssim(BaseGraphModule):
                 if dataset_name == "observations": 
                     obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
                     obs_zeros = torch.isnan(obs)
+                    print("DEVICE OBS ZEROS:", obs_zeros.get_device())
                     print("POINTS D'OBS TRAIN:", torch.count_nonzero(~obs_zeros))
                 
             
@@ -120,6 +121,10 @@ class GraphAssim(BaseGraphModule):
         y = {}
         y_metric = {}
         y_pred_metric = {}
+        zeros_metric = {}
+        mask_metric = {}
+        mask_tilde_metric = {}
+        
 
         for dataset_name, dataset_batch in batch.items():
             print("Y dataset name:", dataset_name)
@@ -133,6 +138,9 @@ class GraphAssim(BaseGraphModule):
                 print(dataset_name, "Y_pred, number of nans:", torch.count_nonzero(torch.isnan(y_pred[dataset_name])))
                 y_metric[dataset_name] = y[dataset_name].clone().detach()
                 y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
+                mask_metric[dataset_name] = obs_zeros.clone().long()
+                mask_tilde_metric[dataset_name] = ~obs_zeros.clone().long()
+                zeros_metric[dataset_name] = torch.zeros(obs_zeros.shape).to(mask_metric[dataset_name].device)
 
         #print("X shape: ", x["increments_input"].shape)
         #print("Y shape: ", y["increments_target"].shape)
@@ -143,6 +151,7 @@ class GraphAssim(BaseGraphModule):
         #print("X ET Y ÉGAUX?", torch.equal(x["increments_input"],y["increments_target"]))
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
+
 
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
@@ -160,7 +169,32 @@ class GraphAssim(BaseGraphModule):
                 if len(self.data_indices[dataset_name].data.output.full) != 0: #si le dataset est en output, on applique le masque: 
                     y_metric[dataset_name][obs_zeros] = 0
                     y_pred_metric[dataset_name][obs_zeros] = 0
-                    
+
+                    mask_tilde_metric_full, zeros_metric_full, grid_shard_slice = self._prepare_tensors_for_loss(
+                    mask_tilde_metric[dataset_name],
+                    zeros_metric[dataset_name],
+                    validation_mode=validation_mode,
+                    dataset_name=dataset_name,
+                    )
+                    wo_norm = self._compute_loss(
+                    y_pred=mask_tilde_metric_full,
+                    y=zeros_metric_full,
+                    grid_shard_slice=grid_shard_slice,
+                    dataset_name=dataset_name,
+                    )
+
+                    mask_metric_full, _, grid_shard_slice = self._prepare_tensors_for_loss(
+                    mask_metric[dataset_name],
+                    zeros_metric[dataset_name],
+                    validation_mode=validation_mode,
+                    dataset_name=dataset_name,
+                    )
+                    wo_bar_norm = self._compute_loss(
+                    y_pred=mask_metric_full,
+                    y=zeros_metric_full,
+                    grid_shard_slice=grid_shard_slice,
+                    dataset_name=dataset_name,
+                    )
             
             _, metrics_masked, _ = checkpoint(
                 self.compute_loss_metrics,
@@ -171,8 +205,11 @@ class GraphAssim(BaseGraphModule):
                 validation_mode=validation_mode,
                 use_reentrant=False,
             )
-
             metrics.update(metrics_masked)
+
+            print("WO NORM:", wo_norm)
+            print("WO bar NORM:", wo_bar_norm)
+            print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
 
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
         if validation_mode: 

@@ -59,6 +59,7 @@ class GraphNodeAttributeScaler(BaseScaler):
         self.inverse = inverse
 
     def get_scaling_values(self) -> torch.Tensor:
+        print("NODE ATTRIBUTES SCALING")
         scaler_values = self.nodes[self.nodes_attribute_name].squeeze()
         scaler_values = ~scaler_values if self.inverse else scaler_values
         return self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)

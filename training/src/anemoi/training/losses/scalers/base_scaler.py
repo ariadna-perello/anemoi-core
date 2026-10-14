@@ -75,6 +75,7 @@ class BaseScaler(ABC):
         scaler_values : torch.Tensor
             Scaler values
         """
+        print("GET SCALING")
         scaler_values = self.get_scaling_values()
         scaler_values = self.normalise(scaler_values)
         scale_dims = tuple(x.value for x in self.scale_dims)
