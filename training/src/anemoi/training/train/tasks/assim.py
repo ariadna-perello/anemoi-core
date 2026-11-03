@@ -85,7 +85,6 @@ class GraphAssim(BaseGraphModule):
     ) -> tuple[torch.Tensor, Mapping[str, torch.Tensor]]:
 
         x = {}
-        obs_zeros = None
 
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
