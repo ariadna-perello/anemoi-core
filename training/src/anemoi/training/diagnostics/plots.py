@@ -537,7 +537,7 @@ def plot_predicted_multilevel_flat_sample(
     plot_kind = "equirectangular" if datashader else projection_kind
     (pc_lon, pc_lat), proj, transform = Projection.for_plot(latlons, plot_kind)
 
-    figsize = (n_plots_y * 4, n_plots_x * 3)
+    figsize = (n_plots_y * 4, n_plots_x * 3.5)
     subplot_kw = {"projection": proj} if proj is not None else {}
     fig, axs = plt.subplots(
         n_plots_x,
@@ -562,6 +562,12 @@ def plot_predicted_multilevel_flat_sample(
              if y_pred is not None 
              else None 
         ) 
+
+        obs_mask = (
+            (obs_mask.reshape(-1) if obs_mask.ndim == 1 else obs_mask[..., variable_idx].reshape(-1))
+            if obs_mask is not None
+            else None
+        )
 
         # get the colormap for the variable as defined in config file
         cmap = colormaps.default.get_cmap() if colormaps.get("default") else cm.get_cmap("viridis")
@@ -752,7 +758,15 @@ def plot_flat_sample(
         data[1:4] = [truth, pred, truth - pred]
         mse = ((truth-pred)**2).mean()
         cor = np.corrcoef(truth,pred)[0,1]
-        ax[2].text(0.5, -0.15, f"MSE={mse}, cor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
+        if obs_mask is not None: 
+            truth_obs = truth.copy()
+            pred_obs = pred.copy()
+            truth_obs[~obs_mask] = 0
+            pred_obs[~obs_mask] = 0
+            mse_obs = ((truth_obs-pred_obs)**2).mean()
+            ax[2].text(0.5, -0.02, f"MSE={mse} \nMSE_obs={mse_obs} \ncor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
+        else: 
+            ax[2].text(0.5, -0.02, f"MSE={mse} \ncor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
         ax[4].axis("off")
         ax[5].axis("off")
 
@@ -895,7 +909,7 @@ def single_plot(
             ax=ax,
         )
         if obs_mask is not None and "pred" in title: 
-            idx, _ = np.nonzero(obs_mask)
+            idx = np.nonzero(obs_mask)
             ax.scatter(lon[idx],lat[idx],c='black',s=0.1)
             
 
