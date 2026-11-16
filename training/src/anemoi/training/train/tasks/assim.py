@@ -109,18 +109,21 @@ class GraphAssim(BaseGraphModule):
                     obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
                     obs_zeros = torch.isnan(obs)
                     print("POINTS D'OBS TRAIN:", torch.count_nonzero((~obs_zeros)[0]))
+                    
                 
         y_pred = self(x)
 
         # We take the last input 
         y = {}
         y_obs = {}
+        y_not_obs = {}
 
         y_pred_obs = {}
+        y_pred_not_obs = {}
         zeros_obs = {}
         mask_tilde_obs = {}
-        #ones_obs ={} 
         mask_obs = {}
+        #ones_obs ={} 
         
         for dataset_name, dataset_batch in batch.items():
             print("Y dataset name:", dataset_name)
@@ -132,8 +135,13 @@ class GraphAssim(BaseGraphModule):
             if validation_mode and obs_zeros is not None:
                 y_obs[dataset_name] = y[dataset_name].clone().detach()
                 y_pred_obs[dataset_name] = y_pred[dataset_name].clone().detach()
-                mask_obs[dataset_name] = obs_zeros.clone().long()
+                y_not_obs[dataset_name] = y[dataset_name].clone().detach()
+                y_pred_not_obs[dataset_name] = y_pred[dataset_name].clone().detach()
+                mask_obs[dataset_name] = obs_zeros.long()
                 mask_tilde_obs[dataset_name] = (~obs_zeros).long()
+                print("SHAPE DE Y OBS:", y_obs[dataset_name].shape)
+                print("SHAPE OBS ZEROS:", obs_zeros.shape)
+                print("SHAPE DE MASK TILDE OBS:", mask_tilde_obs[dataset_name].shape)
                 #print("NB NON OBS:", torch.count_nonzero(mask_obs[dataset_name][0]))
                 #print("NB OBS:", torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
                 #print("SUM TOTAL", torch.count_nonzero(mask_obs[dataset_name][0]) + torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
@@ -160,6 +168,9 @@ class GraphAssim(BaseGraphModule):
                     y_obs[dataset_name][obs_zeros] = 0
                     y_pred_obs[dataset_name][obs_zeros] = 0
 
+                    y_not_obs[dataset_name][~obs_zeros] = 0
+                    y_pred_not_obs[dataset_name][~obs_zeros] = 0
+
                     mask_tilde_obs_full, zeros_obs_full, grid_shard_slice = self._prepare_tensors_for_loss(
                     mask_tilde_obs[dataset_name],
                     zeros_obs[dataset_name],
@@ -172,7 +183,23 @@ class GraphAssim(BaseGraphModule):
                     grid_shard_slice=grid_shard_slice,
                     dataset_name=dataset_name,
                     )
-                    norm_coef = dataset_batch.shape[0] * wo_norm
+                    norm_coef_obs = dataset_batch.shape[0] * wo_norm
+
+                    
+                    mask_obs_full, _, grid_shard_slice = self._prepare_tensors_for_loss(
+                    mask_obs[dataset_name],
+                    zeros_obs[dataset_name],
+                    validation_mode=validation_mode,
+                    dataset_name=dataset_name,
+                    )
+                    wo_bar_norm = self._compute_loss(
+                    y_pred=mask_obs_full,
+                    y=zeros_obs_full,
+                    grid_shard_slice=grid_shard_slice,
+                    dataset_name=dataset_name,
+                    )
+                    
+                    norm_coef_not_obs = dataset_batch.shape[0] * wo_bar_norm
 
                     '''
                     _, ones_obs_full, _ = self._prepare_tensors_for_loss(
@@ -189,20 +216,6 @@ class GraphAssim(BaseGraphModule):
                     dataset_name=dataset_name,
                     )
                     '''
-                    '''
-                    mask_obs_full, _, grid_shard_slice = self._prepare_tensors_for_loss(
-                    mask_obs[dataset_name],
-                    zeros_obs[dataset_name],
-                    validation_mode=validation_mode,
-                    dataset_name=dataset_name,
-                    )
-                    wo_bar_norm = self._compute_loss(
-                    y_pred=mask_obs_full,
-                    y=zeros_obs_full,
-                    grid_shard_slice=grid_shard_slice,
-                    dataset_name=dataset_name,
-                    )
-                    '''
                     
 
             _, metrics_obs, _ = checkpoint(
@@ -214,14 +227,31 @@ class GraphAssim(BaseGraphModule):
                 validation_mode=validation_mode,
                 use_reentrant=False,
             )
+
+            _, metrics_not_obs, _ = checkpoint(
+                self.compute_loss_metrics,
+                y_pred_not_obs,
+                y_not_obs,
+                step=2,
+                training_mode=True,
+                validation_mode=validation_mode,
+                use_reentrant=False,
+            )
+
             for key in metrics_obs.keys(): 
                 if 'mse_loss' in key: 
-                    metrics_obs[key] = metrics_obs[key]/norm_coef
-            metrics.update(metrics_obs)
+                    metrics_obs[key] = metrics_obs[key]/norm_coef_obs
 
-            #print("WO NORM:", wo_norm)
-            #print("WO bar NORM:", wo_bar_norm)
-            #print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
+            for key in metrics_not_obs.keys(): 
+                if 'mse_loss' in key: 
+                    metrics_not_obs[key] = metrics_not_obs[key]/norm_coef_not_obs
+
+            metrics.update(metrics_obs)
+            metrics.update(metrics_not_obs)
+
+            print("WO NORM:", wo_norm)
+            print("WO bar NORM:", wo_bar_norm)
+            print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
             #print("W NORMALISE = ", W_norm)
         print("METRICS RETURNED:",metrics.keys(), metrics.values())
 
