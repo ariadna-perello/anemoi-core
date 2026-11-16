@@ -109,18 +109,21 @@ class GraphAssim(BaseGraphModule):
                     obs = self.model.post_processors[dataset_name](x[dataset_name],in_place=False)
                     obs_zeros = torch.isnan(obs)
                     print("POINTS D'OBS TRAIN:", torch.count_nonzero((~obs_zeros)[0]))
+                    
                 
         y_pred = self(x)
 
         # We take the last input 
         y = {}
-        y_metric = {}
+        y_obs = {}
+        y_not_obs = {}
 
-        y_pred_metric = {}
-        zeros_metric = {}
-        mask_tilde_metric = {}
-        #ones_metric ={} 
-        #mask_metric = {}
+        y_pred_obs = {}
+        y_pred_not_obs = {}
+        zeros_obs = {}
+        mask_tilde_obs = {}
+        mask_obs = {}
+        #ones_obs ={} 
         
         for dataset_name, dataset_batch in batch.items():
             print("Y dataset name:", dataset_name)
@@ -130,15 +133,20 @@ class GraphAssim(BaseGraphModule):
                 LOGGER.info ("unsqueeze data output")
                 y[dataset_name] = y[dataset_name].unsqueeze(2)
             if validation_mode and obs_zeros is not None:
-                y_metric[dataset_name] = y[dataset_name].clone().detach()
-                y_pred_metric[dataset_name] = y_pred[dataset_name].clone().detach()
-                #mask_metric[dataset_name] = obs_zeros.clone().long()
-                mask_tilde_metric[dataset_name] = (~obs_zeros).long()
-                #print("NB NON OBS:", torch.count_nonzero(mask_metric[dataset_name][0]))
-                #print("NB OBS:", torch.count_nonzero(mask_tilde_metric[dataset_name][0]))
-                #print("SUM TOTAL", torch.count_nonzero(mask_metric[dataset_name][0]) + torch.count_nonzero(mask_tilde_metric[dataset_name][0]))
-                zeros_metric[dataset_name] = torch.zeros(obs_zeros.shape).to(mask_tilde_metric[dataset_name].device)
-                #ones_metric[dataset_name] = torch.ones(obs_zeros.shape).to(mask_metric[dataset_name].device)
+                y_obs[dataset_name] = y[dataset_name].clone().detach()
+                y_pred_obs[dataset_name] = y_pred[dataset_name].clone().detach()
+                y_not_obs[dataset_name] = y[dataset_name].clone().detach()
+                y_pred_not_obs[dataset_name] = y_pred[dataset_name].clone().detach()
+                mask_obs[dataset_name] = obs_zeros.long()
+                mask_tilde_obs[dataset_name] = (~obs_zeros).long()
+                print("SHAPE DE Y OBS:", y_obs[dataset_name].shape)
+                print("SHAPE OBS ZEROS:", obs_zeros.shape)
+                print("SHAPE DE MASK TILDE OBS:", mask_tilde_obs[dataset_name].shape)
+                #print("NB NON OBS:", torch.count_nonzero(mask_obs[dataset_name][0]))
+                #print("NB OBS:", torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
+                #print("SUM TOTAL", torch.count_nonzero(mask_obs[dataset_name][0]) + torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
+                zeros_obs[dataset_name] = torch.zeros(obs_zeros.shape).to(mask_tilde_obs[dataset_name].device)
+                #ones_obs[dataset_name] = torch.ones(obs_zeros.shape).to(mask_obs[dataset_name].device)
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
 
@@ -157,71 +165,93 @@ class GraphAssim(BaseGraphModule):
             for dataset_name, dataset_batch in batch.items():
                 if len(self.data_indices[dataset_name].data.output.full) != 0: #si le dataset est en output, on applique le masque: 
 
-                    y_metric[dataset_name][obs_zeros] = 0
-                    y_pred_metric[dataset_name][obs_zeros] = 0
+                    y_obs[dataset_name][obs_zeros] = 0
+                    y_pred_obs[dataset_name][obs_zeros] = 0
 
-                    mask_tilde_metric_full, zeros_metric_full, grid_shard_slice = self._prepare_tensors_for_loss(
-                    mask_tilde_metric[dataset_name],
-                    zeros_metric[dataset_name],
+                    y_not_obs[dataset_name][~obs_zeros] = 0
+                    y_pred_not_obs[dataset_name][~obs_zeros] = 0
+
+                    mask_tilde_obs_full, zeros_obs_full, grid_shard_slice = self._prepare_tensors_for_loss(
+                    mask_tilde_obs[dataset_name],
+                    zeros_obs[dataset_name],
                     validation_mode=validation_mode,
                     dataset_name=dataset_name,
                     )
                     wo_norm = self._compute_loss(
-                    y_pred=mask_tilde_metric_full,
-                    y=zeros_metric_full,
+                    y_pred=mask_tilde_obs_full,
+                    y=zeros_obs_full,
                     grid_shard_slice=grid_shard_slice,
                     dataset_name=dataset_name,
                     )
-                    norm_coef = dataset_batch.shape[0] * wo_norm
+                    norm_coef_obs = dataset_batch.shape[0] * wo_norm
+
+                    
+                    mask_obs_full, _, grid_shard_slice = self._prepare_tensors_for_loss(
+                    mask_obs[dataset_name],
+                    zeros_obs[dataset_name],
+                    validation_mode=validation_mode,
+                    dataset_name=dataset_name,
+                    )
+                    wo_bar_norm = self._compute_loss(
+                    y_pred=mask_obs_full,
+                    y=zeros_obs_full,
+                    grid_shard_slice=grid_shard_slice,
+                    dataset_name=dataset_name,
+                    )
+                    
+                    norm_coef_not_obs = dataset_batch.shape[0] * wo_bar_norm
 
                     '''
-                    _, ones_metric_full, _ = self._prepare_tensors_for_loss(
-                    mask_tilde_metric[dataset_name],
-                    ones_metric[dataset_name],
+                    _, ones_obs_full, _ = self._prepare_tensors_for_loss(
+                    mask_tilde_obs[dataset_name],
+                    ones_obs[dataset_name],
                     validation_mode=validation_mode,
                     dataset_name=dataset_name,
                     )
 
                     W_norm = self._compute_loss(
-                    y_pred=ones_metric_full,
-                    y=zeros_metric_full,
-                    grid_shard_slice=grid_shard_slice,
-                    dataset_name=dataset_name,
-                    )
-                    '''
-                    '''
-                    mask_metric_full, _, grid_shard_slice = self._prepare_tensors_for_loss(
-                    mask_metric[dataset_name],
-                    zeros_metric[dataset_name],
-                    validation_mode=validation_mode,
-                    dataset_name=dataset_name,
-                    )
-                    wo_bar_norm = self._compute_loss(
-                    y_pred=mask_metric_full,
-                    y=zeros_metric_full,
+                    y_pred=ones_obs_full,
+                    y=zeros_obs_full,
                     grid_shard_slice=grid_shard_slice,
                     dataset_name=dataset_name,
                     )
                     '''
                     
 
-            _, metrics_masked, _ = checkpoint(
+            _, metrics_obs, _ = checkpoint(
                 self.compute_loss_metrics,
-                y_pred_metric,
-                y_metric,
+                y_pred_obs,
+                y_obs,
                 step=1,
                 training_mode=True,
                 validation_mode=validation_mode,
                 use_reentrant=False,
             )
-            for key in metrics_masked.keys(): 
-                if 'mse_loss' in key: 
-                    metrics_masked[key] = metrics_masked[key]/norm_coef
-            metrics.update(metrics_masked)
 
-            #print("WO NORM:", wo_norm)
-            #print("WO bar NORM:", wo_bar_norm)
-            #print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
+            _, metrics_not_obs, _ = checkpoint(
+                self.compute_loss_metrics,
+                y_pred_not_obs,
+                y_not_obs,
+                step=2,
+                training_mode=True,
+                validation_mode=validation_mode,
+                use_reentrant=False,
+            )
+
+            for key in metrics_obs.keys(): 
+                if 'mse_loss' in key: 
+                    metrics_obs[key] = metrics_obs[key]/norm_coef_obs
+
+            for key in metrics_not_obs.keys(): 
+                if 'mse_loss' in key: 
+                    metrics_not_obs[key] = metrics_not_obs[key]/norm_coef_not_obs
+
+            metrics.update(metrics_obs)
+            metrics.update(metrics_not_obs)
+
+            print("WO NORM:", wo_norm)
+            print("WO bar NORM:", wo_bar_norm)
+            print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
             #print("W NORMALISE = ", W_norm)
         print("METRICS RETURNED:",metrics.keys(), metrics.values())
 
