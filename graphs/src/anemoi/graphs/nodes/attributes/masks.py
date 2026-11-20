@@ -182,3 +182,34 @@ class LimitedAreaMask(BooleanBaseNodeAttribute):
         ], f"{self.__class__.__name__} can only be used with StretchedIcosahedronNodes."
         lam_mask = nodes["_area_mask_builder"].get_mask(nodes.x)
         return torch.from_numpy(lam_mask)
+    
+class SurfacePressureMask(BooleanBaseNodeAttribute):
+
+    """Mask based on surface pressure threshold.
+
+    This mask filters nodes based on whether the associated surface pressure 
+    is above a given threshold (default 850 hPa).
+    """
+    
+
+    def __init__(self, variable: str, threshold: float = 85000.0) -> None:
+        super().__init__()
+        self.variable = variable
+        self.threshold = threshold
+
+    def _get_mask(self, ds) -> np.ndarray:
+        # Return True for nodes where surface pressure is above threshold
+        return ds >= self.threshold
+
+    def get_raw_values(self, nodes: NodeStorage, **kwargs) -> torch.Tensor:
+        assert nodes["node_type"] in [
+            "ZarrDatasetNodes",
+            "AnemoiDatasetNodes",
+        ], f"{self.__class__.__name__} can only be used with AnemoiDatasetNodes."
+        var = self.variable
+        ds = open_dataset("/lustre/fsn1/projects/rech/oga/commun/assim_t850_2/aiarp-ea-an-oper-0001-mars-o96-2024-0h-12h-z-sp-from-grib.zarr", select=var, start="20240101", end="20240101")[0].squeeze()
+        return torch.from_numpy(self._get_mask(ds))
+
+        
+
+

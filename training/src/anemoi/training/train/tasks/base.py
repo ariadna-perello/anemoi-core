@@ -249,6 +249,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
                 nodes_name=dataset_name,
                 output_mask=self.output_mask[dataset_name],
             )
+            print("OUTPUT MASK :", self.output_mask.items())
             self.scalers[dataset_name] = dataset_scalers
             self.updating_scalars[dataset_name] = dataset_updating_scalars
 
