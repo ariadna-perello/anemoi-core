@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
 import pandas as pd
+import torch
 from datashader.mpl_ext import dsshow
 from matplotlib.collections import LineCollection
 from matplotlib.collections import PathCollection
@@ -28,6 +29,7 @@ from matplotlib.colors import TwoSlopeNorm
 from matplotlib.figure import Figure
 from scipy.interpolate import griddata
 from torch import Tensor
+
 
 from anemoi.models.layers.graph import NamedNodesAttributes
 from anemoi.training.diagnostics.maps import map_features
@@ -495,6 +497,7 @@ def plot_predicted_multilevel_flat_sample(
     colormaps: dict[str, Colormap] | None = None,
     projection_kind: str = "equirectangular",
     obs_mask: np.ndarray = None,
+    mask_sp: np.ndarray = None,
 ) -> Figure:
     """Plots data for one multilevel latlon-"flat" sample.
 
@@ -577,6 +580,7 @@ def plot_predicted_multilevel_flat_sample(
                 cmap = colormaps[key].get_cmap()
                 continue
         ax = axs[plot_idx, :] if n_plots_x > 1 else axs
+        print("PLOT PREDICTED MULTI SAMPLE - NUMBER OF NANS IN PRED:", np.count_nonzero(np.isnan(yp)))
         plot_flat_sample(
             fig=fig,
             ax=ax,
@@ -593,6 +597,7 @@ def plot_predicted_multilevel_flat_sample(
             error_cmap=error_cmap,
             transform=transform,
             obs_mask=obs_mask,
+            mask_sp=mask_sp,
         )
     return fig
 
@@ -657,6 +662,7 @@ def plot_flat_sample(
     error_cmap: Colormap | None = None,
     transform: object | None = None,
     obs_mask: np.ndarray = None,
+    mask_sp: np.ndarray = None
 ) -> None:
     """Plot a "flat" 1D sample.
 
@@ -696,6 +702,7 @@ def plot_flat_sample(
     -------
     None
     """
+
     precip_and_related_fields = precip_and_related_fields or []
     input_, truth, pred = _scale_precip_fields(
         vname,
@@ -704,21 +711,20 @@ def plot_flat_sample(
         truth,
         pred,
     )
-
     data = [None for _ in range(6)]
     # default titles for 6 plots
     titles = [
         f"{vname} input",
         f"{vname} target",
         f"{vname} pred",
+        f"{vname} pred masque relief",
         f"{vname} pred err",
-        f"{vname} increment [pred - input]",
         f"{vname} persist err",
     ]
 
 
     # colormaps
-    cmaps = [cmap] * 3 + [error_cmap] * 3
+    cmaps = [cmap] * 4 + [error_cmap] * 2
     # normalizations for significant colormaps
     norms = [None for _ in range(6)]
 
@@ -755,9 +761,17 @@ def plot_flat_sample(
     else: 
         print("NO INPUT------------------------")
         ax[0].axis("off")
-        data[1:4] = [truth, pred, truth - pred]
-        mse = ((truth-pred)**2).mean()
-        cor = np.corrcoef(truth,pred)[0,1]
+        if mask_sp is None: 
+            ax[3].axis("off")
+            data[1:5] = [truth, pred, None, truth - pred]
+        else: 
+            pred_mask_sp = (mask_sp.apply(torch.from_numpy(pred), dim=0, fill_value=np.nan).numpy())
+            data[1:5] = [truth, pred, pred_mask_sp, truth - pred]
+
+        print("NUMBER OF NANS IN TARGET:", np.count_nonzero(np.isnan(truth)))
+        print("NUMBER OF NANS IN PRED:", np.count_nonzero(np.isnan(pred)))
+        mse = np.nanmean((truth-pred)**2)
+        cor = np.ma.corrcoef(truth,pred)[0,1]
         if obs_mask is not None: 
             truth_obs = truth.copy()
             pred_obs = pred.copy()
@@ -767,13 +781,10 @@ def plot_flat_sample(
             ax[2].text(0.5, -0.02, f"MSE={mse} \nMSE_obs={mse_obs} \ncor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
         else: 
             ax[2].text(0.5, -0.02, f"MSE={mse} \ncor(pred,target)={cor}",transform=ax[2].transAxes, ha='center', va='top')
-        ax[4].axis("off")
         ax[5].axis("off")
 
         if np.any(truth<=0): #if increments are predicted 
-            cmaps[1:4] = [error_cmap] * 3
-            #arrays_for_norm = [truth, pred, truth - pred]
-            #combined = np.concatenate(arrays_for_norm)
+            cmaps[1:5] = [error_cmap] * 4
             shared_norm = TwoSlopeNorm(
                 vmin=-max(1e-5, 2*np.nanstd(truth)),
                 vcenter=0.0,
@@ -782,11 +793,10 @@ def plot_flat_sample(
             norms[1] = shared_norm
             norms[2] = shared_norm
             norms[3] = shared_norm
+            norms[4] = shared_norm
             
 
         else: 
-            #data[4] = pred - input_
-            #data[5] = truth - input_
             main_norm = _compute_main_norm(
             vname,
             precip_and_related_fields,
@@ -797,11 +807,12 @@ def plot_flat_sample(
             )
             norms[1] = main_norm
             norms[2] = main_norm
-            norms[3] = TwoSlopeNorm(
+            norms[3] = main_norm
+            norms[4] = TwoSlopeNorm(
                 vmin=-max(1e-5, np.nanmax(data[3])),
                 vcenter=0.0,
                 vmax=max(1e-5, np.nanmax(data[3])),
-            ) 
+            )
 
         '''
         combined_error = np.concatenate(((pred - input_), (truth - input_)))

@@ -198,7 +198,8 @@ class SurfacePressureMask(BooleanBaseNodeAttribute):
         self.threshold = threshold
 
     def _get_mask(self, ds) -> np.ndarray:
-        # Return True for nodes where surface pressure is above threshold
+        # Return True for nodes where surface pressure is under threshold
+        print("BUILD SP MASK IN SCALER")
         return ds >= self.threshold
 
     def get_raw_values(self, nodes: NodeStorage, **kwargs) -> torch.Tensor:

@@ -77,15 +77,6 @@ class GraphAssim(BaseGraphModule):
         )
 
         self._plot_adapter = AssimilationPlotAdapter(self)
-        self.activate_orography_mask = config.training.get("activate_orography_mask", False)
-
-        sp_ref_field = open_dataset("/lustre/fsn1/projects/rech/oga/commun/assim_t850_2/aiarp-ea-an-oper-0001-mars-o96-2024-0h-12h-z-sp-from-grib.zarr", select= 'sp', start="20240101", end="20240101")
-        self.mask_sp = None
-
-        if self.activate_orography_mask:
-            threshold = config.training.get("orography_mask_threshold", 85000)
-            self.mask_sp = torch.as_tensor(sp_ref_field[0] >= threshold, dtype=torch.bool).unsqueeze(-1)
-            print("SHAPE MASK SP:", self.mask_sp.shape)
             
 
     def _step(
@@ -162,16 +153,6 @@ class GraphAssim(BaseGraphModule):
                 #ones_obs[dataset_name] = torch.ones(obs_zeros.shape).to(mask_obs[dataset_name].device)
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
-        if self.activate_orography_mask: 
-            for dataset_name, dataset_batch in batch.items():
-                if len(self.data_indices[dataset_name].data.output.full) != 0:
-                    mask_sp = self.mask_sp.to(device=y[dataset_name].device, dtype=torch.bool)
-                    print("SHAPE MASK SP AFTER CONVERT:", mask_sp.shape)
-                    y[dataset_name]= torch.where(mask_sp, y[dataset_name], 0)
-                    y_pred[dataset_name]= torch.where(mask_sp, y_pred[dataset_name], 0)
-                    print("Y AFTER MASK:", y[dataset_name].shape)
-                    print("Y PRED AFTER MASK:", y_pred[dataset_name].shape)
-
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
             y_pred,

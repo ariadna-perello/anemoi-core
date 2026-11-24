@@ -62,7 +62,12 @@ class GraphNodeAttributeScaler(BaseScaler):
         print("NODE ATTRIBUTES SCALING")
         scaler_values = self.nodes[self.nodes_attribute_name].squeeze()
         scaler_values = ~scaler_values if self.inverse else scaler_values
-        return self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)
+        print("NB POINTS SUR LE RELIEF AVANT MASQUE:", (scaler_values != 0).sum())
+        print("OUTPUT MASK APPLIQUÉ:", self.output_mask)
+        #return self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)
+        masked_tensor = self.output_mask.apply(scaler_values, dim=0, fill_value=0.0)
+        print("NB POINTS SUR LE RELIEF APRÈS MASQUE:", (masked_tensor != 0).sum())
+        return masked_tensor
 
 
 class ReweightedGraphNodeAttributeScaler(GraphNodeAttributeScaler):

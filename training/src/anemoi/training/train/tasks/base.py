@@ -275,6 +275,9 @@ class BaseGraphModule(pl.LightningModule, ABC):
                 data_indices[dataset_name],
             )
 
+            print("VALEUR MOYENNE DU SCALING SUR LES NOEUDS:", self.loss['increments'].scaler.subset_by_dim(3).get_scaler(5).reshape(-1).mean())
+            print("SOMME DU SCALING SUR LES NOEUDS:", self.loss['increments'].scaler.subset_by_dim(3).get_scaler(5).reshape(-1).sum())
+
         if config.training.loss_gradient_scaling:
             # Multi-dataset: register hook for each loss
             for loss_fn in self.loss.values():

@@ -574,10 +574,11 @@ class ScaleTensor(nn.Module):
             reshaped_scaler = torch.moveaxis(reshaped_scaler, list(range(ndim)), (*missing_dims, *dims))
 
             reshaped_scaler = reshaped_scaler.expand_as(x)
+            print("SHAPE RESHAPED SCALER", reshaped_scaler.shape)
 
             if subset_indices is not None:
                 reshaped_scaler = reshaped_scaler[subset_indices]
-
+            print("NB DE POINTS NON NULS SCALER SCALE BASE LOSS:", (reshaped_scaler[0]!=0).sum())
             out = out * reshaped_scaler
 
         return out
