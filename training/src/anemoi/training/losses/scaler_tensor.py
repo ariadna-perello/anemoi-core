@@ -577,7 +577,7 @@ class ScaleTensor(nn.Module):
 
             if subset_indices is not None:
                 reshaped_scaler = reshaped_scaler[subset_indices]
-
+            print("NB DE POINTS NON NULS SCALER SCALE BASE LOSS:", (reshaped_scaler[0]!=0).sum())
             out = out * reshaped_scaler
 
         return out

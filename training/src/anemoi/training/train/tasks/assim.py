@@ -76,7 +76,7 @@ class GraphAssim(BaseGraphModule):
         )
 
         self._plot_adapter = AssimilationPlotAdapter(self)
-
+            
 
     def _step(
         self,
@@ -86,6 +86,8 @@ class GraphAssim(BaseGraphModule):
 
         x = {}
         obs_zeros = None
+
+        
         # We agree to take several input if needed. 
         for dataset_name, dataset_batch in batch.items():
             LOGGER.info("SHAPES: batch.shape = %s, input_step = %d, output_step = %d", list(dataset_batch.shape), self.n_step_input, self.n_step_output )
@@ -132,6 +134,7 @@ class GraphAssim(BaseGraphModule):
             if len(y[dataset_name].shape)<5: 
                 LOGGER.info ("unsqueeze data output")
                 y[dataset_name] = y[dataset_name].unsqueeze(2)
+
             if validation_mode and obs_zeros is not None:
                 y_obs[dataset_name] = y[dataset_name].clone().detach()
                 y_pred_obs[dataset_name] = y_pred[dataset_name].clone().detach()
@@ -139,15 +142,9 @@ class GraphAssim(BaseGraphModule):
                 y_pred_not_obs[dataset_name] = y_pred[dataset_name].clone().detach()
                 mask_obs[dataset_name] = obs_zeros.long()
                 mask_tilde_obs[dataset_name] = (~obs_zeros).long()
-                #print("NB NON OBS:", torch.count_nonzero(mask_obs[dataset_name][0]))
-                #print("NB OBS:", torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
-                #print("SUM TOTAL", torch.count_nonzero(mask_obs[dataset_name][0]) + torch.count_nonzero(mask_tilde_obs[dataset_name][0]))
                 zeros_obs[dataset_name] = torch.zeros(obs_zeros.shape).to(mask_tilde_obs[dataset_name].device)
-                #ones_obs[dataset_name] = torch.ones(obs_zeros.shape).to(mask_obs[dataset_name].device)
 
         # y includes the auxiliary variables, so we must leave those out when computing the loss
-
-
         loss, metrics, y_pred = checkpoint(
             self.compute_loss_metrics,
             y_pred,
@@ -235,6 +232,7 @@ class GraphAssim(BaseGraphModule):
                 use_reentrant=False,
             )
 
+
             for key in metrics_obs.keys(): 
                 if 'mse_loss' in key: 
                     metrics_obs[key] = metrics_obs[key]/norm_coef_obs
@@ -246,14 +244,22 @@ class GraphAssim(BaseGraphModule):
             metrics.update(metrics_obs)
             metrics.update(metrics_not_obs)
 
-            print("WO NORM:", wo_norm)
-            print("WO bar NORM:", wo_bar_norm)
-            print("WO NORM + WO bar NORM =", wo_norm+wo_bar_norm)
-            #print("W NORMALISE = ", W_norm)
+            #Vérification
+            L_obs = self.loss['increments'](y_pred_obs['increments'][0].unsqueeze(0), y_obs['increments'][0].unsqueeze(0), grid_shard_slice=grid_shard_slice, group=self.model_comm_group)
+            L_not_obs = self.loss['increments'](y_pred_not_obs['increments'][0].unsqueeze(0), y_not_obs['increments'][0].unsqueeze(0), grid_shard_slice=grid_shard_slice, group=self.model_comm_group)
+            L_tot = self.loss['increments'](y_pred['increments'][0].unsqueeze(0), y['increments'][0].unsqueeze(0), grid_shard_slice=grid_shard_slice, group=self.model_comm_group)
+            print("Loss totale bien reconstruite:", torch.isclose(L_tot,L_obs + L_not_obs))
+            print("L_obs=", L_obs, "L_not_obs=", L_not_obs, "L_tot=", L_tot)
+
+            L_tot_2 = metrics_obs['increments_mse_loss/2'] * norm_coef_obs + metrics_not_obs['increments_mse_loss/3'] * norm_coef_not_obs
+            print("Loss totale avec BS=1 bien reconstruite:", torch.isclose(L_tot_2,loss))
+            print("L_obs * L(m,0) =", metrics_obs['increments_mse_loss/2'] * norm_coef_obs, "L_not_obs * L((1-m),0)=", metrics_not_obs['increments_mse_loss/3'] * norm_coef_not_obs, "loss=", loss)
+            
         print("METRICS RETURNED:",metrics.keys(), metrics.values())
 
         # All tasks return (loss, metrics, list of per-step dicts) for consistent plot callback contract.
         return loss, metrics, [y_pred]
+
 
 
     def on_train_epoch_start(self): 

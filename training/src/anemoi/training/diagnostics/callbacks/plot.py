@@ -46,6 +46,7 @@ from anemoi.training.diagnostics.plots import plot_predicted_multilevel_flat_sam
 from anemoi.training.losses.base import BaseLoss
 from anemoi.training.losses.utils import reduce_to_last_dim
 from anemoi.training.schemas.base_schema import BaseSchema
+from anemoi.training.utils.masks import NoOutputMask
 
 
 LOGGER = logging.getLogger(__name__)
@@ -1218,6 +1219,80 @@ class PlotSample(BasePlotAdditionalMetrics):
             self.precip_and_related_fields,
         )
 
+    def process(
+        self,
+        pl_module: pl.LightningModule,
+        dataset_name: str,
+        outputs: tuple[torch.Tensor, list[dict[str, torch.Tensor]]],
+        batch: dict[str, torch.Tensor],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Process the data and output tensors for plotting one dataset specified by dataset_name.
+
+        Parameters
+        ----------
+        pl_module : pl.LightningModule
+            The LightningModule instance
+        dataset_name : str
+            The name of the dataset to process
+        outputs : tuple[torch.Tensor, list[dict[str, torch.Tensor]]]
+            The outputs from the model. The second element must be a list of dicts
+            (one per outer step). Tasks with a single step (e.g. diffusion, multi-out
+            interpolator) must return [y_pred] so that ``for x in outputs[1]``
+            iterates over steps; if they return the dict directly, iteration would
+            be over dataset names and indexing would fail.
+        batch : dict[str, torch.Tensor]
+            The batch of data
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            The data and output tensors for plotting
+        """
+
+        if self.latlons is None:
+            self.latlons = {}
+
+        if dataset_name not in self.latlons:
+            self.latlons[dataset_name] = pl_module.model.model._graph_data[dataset_name].x.detach()
+            self.latlons[dataset_name] = np.rad2deg(self.latlons[dataset_name].cpu().numpy())
+
+        # All tasks return (loss, metrics, list of per-step dicts) from _step; on_validation_batch_end enforces list.
+        assert isinstance(
+            outputs[1],
+            list,
+        ), "outputs[1] must be a list of per-step dicts."
+
+        # prepare input and output tensors for plotting one dataset specified by dataset_name
+        total_targets = pl_module.plot_adapter.get_total_plot_targets()
+
+
+        input_tensor = (
+            batch[dataset_name][
+                :,
+                pl_module.n_step_input - 1 : pl_module.n_step_input + total_targets + 1,
+                ...,
+                pl_module.data_indices[dataset_name].data.output.full,
+            ]
+            .detach()
+            .cpu()
+        )
+        
+        data = self.post_processors[dataset_name](input_tensor)[self.sample_idx]
+        output_tensor = torch.cat(
+            tuple(
+                self.post_processors[dataset_name](x[dataset_name][:, ...].detach().cpu(), in_place=False)[
+                    self.sample_idx : self.sample_idx + 1
+                ]
+                for x in outputs[1]
+            ),
+        )
+
+        output_tensor = pl_module.plot_adapter.prepare_plot_output_tensor(output_tensor)
+        output_tensor = output_tensor.numpy()
+        data = data.numpy()
+
+        return data, output_tensor
+
     def process_forcings(
             self,
             pl_module: pl.LightningModule,
@@ -1286,7 +1361,10 @@ class PlotSample(BasePlotAdditionalMetrics):
 
         print("START PLOTTING--------------------------")
         obs_mask = None 
-
+        mask_sp = pl_module.output_mask['increments']
+        if isinstance(mask_sp, NoOutputMask): 
+            mask_sp = None 
+        
         for dataset_name in dataset_names:
             print("DATASET NAME:", dataset_name)
             # Build dictionary of indices and parameters to be plotted
@@ -1307,6 +1385,7 @@ class PlotSample(BasePlotAdditionalMetrics):
                 }
 
                 data, output_tensor = self.process(pl_module, dataset_name, outputs, batch)
+                print("OUTPUT TENSOR - NUMBER OF NANS IN PRED:", np.count_nonzero(np.isnan(output_tensor[0,0,...].squeeze(0))))
 
                 if "observations" in self.config.data.datasets.keys(): 
                     observations, _ = self.process_forcings(pl_module, "observations", batch)
@@ -1358,7 +1437,7 @@ class PlotSample(BasePlotAdditionalMetrics):
 
                 else:
                     x, y_true, y_pred, tag_suffix = item
-                    print("X, Y_TRUE, Y_PRED: ", np.shape(x), np.shape(y_true), np.shape(y_pred))
+                    print("PLOT SAMPLE - NUMBER OF NANS IN PRED:", np.count_nonzero(np.isnan(y_pred)))
 
                 fig = plot_predicted_multilevel_flat_sample(
                     plot_parameters_dict,
@@ -1373,6 +1452,7 @@ class PlotSample(BasePlotAdditionalMetrics):
                     colormaps=self.colormaps,
                     projection_kind=self.projection_kind,
                     obs_mask=obs_mask,
+                    mask_sp=mask_sp
                 )
                 date = trainer.datamodule.ds_valid.data[dataset_name].dates[batch_idx*batch[dataset_name].shape[0]+self.sample_idx]
                 fig.suptitle(f"Date: {date}, Epoch: {epoch}")

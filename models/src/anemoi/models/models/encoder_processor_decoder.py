@@ -209,6 +209,7 @@ class AnemoiModelEncProcDec(BaseGraphModel):
         dict[str, Tensor]
             Output of the model, with the same shape as the input (sharded if input is sharded)
         """
+
         dataset_names = list(x.keys())
 
         # Extract and validate batch & ensemble sizes across datasets
@@ -250,7 +251,6 @@ class AnemoiModelEncProcDec(BaseGraphModel):
             )
 
             # Encoder for this dataset
-            print(f"DATASET NAME BEFORE ENCODER: {dataset_name}")
             x_data_latent, x_latent = self.encoder[dataset_name](
                 (x_data_latent, x_hidden_latent),
                 batch_size=batch_size,

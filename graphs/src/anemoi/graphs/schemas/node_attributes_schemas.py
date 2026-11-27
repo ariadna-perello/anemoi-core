@@ -55,6 +55,12 @@ class CutOutMaskSchema(BaseModel):
     )
     "Implementation of the area masks from anemoi.graphs.nodes.attributes."
 
+class SurfacePressureMaskSchema(BaseModel):
+    target_: Literal["anemoi.graphs.nodes.attributes.SurfacePressureMask"] = Field(..., alias="_target_")
+    "Mask based on surface pressure threshold."
+    variable: str
+    threshold: float
+
 
 class GridsMaskSchema(BaseModel):
     target_: Literal["anemoi.graphs.nodes.attributes.GridsMask"] = Field(..., alias="_target_")
@@ -78,6 +84,7 @@ SingleAttributeSchema = (
     | MaskedPlanarAreaWeightsSchema
     | SphericalAreaWeightSchema
     | CutOutMaskSchema
+    | SurfacePressureMaskSchema
     | GridsMaskSchema
     | NonmissingAnemoiDatasetVariableSchema
 )

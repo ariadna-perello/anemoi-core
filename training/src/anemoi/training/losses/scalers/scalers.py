@@ -27,7 +27,8 @@ def create_scalers(scalers_config: DotDict, **kwargs) -> tuple[dict[str, TENSOR_
 
         if isinstance(scaler_builder, BaseUpdatingScaler):
             updating_scalars[name] = scaler_builder
-
+        print("SCALER NAME:", name)
         scalers[name] = scaler_builder.get_scaling()
+        print("SOMME SCALERS NORMALISÉS:", scalers[name][1].sum())
 
     return scalers, updating_scalars
