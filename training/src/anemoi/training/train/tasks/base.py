@@ -209,6 +209,7 @@ class BaseGraphModule(pl.LightningModule, ABC):
 
         self.statistics_tendencies = statistics_tendencies
 
+
         # Initialize components for multi-dataset
         self.target_dataset_names = []  # list of dataset names used for loss computation
         self.scalers = {}  # dict of dict of tensors
@@ -275,7 +276,6 @@ class BaseGraphModule(pl.LightningModule, ABC):
                 data_indices[dataset_name],
             )
 
-            print("VALEUR MOYENNE DU SCALING SUR LES NOEUDS:", self.loss['increments'].scaler.subset_by_dim(3).get_scaler(5).reshape(-1).mean())
             print("SOMME DU SCALING SUR LES NOEUDS:", self.loss['increments'].scaler.subset_by_dim(3).get_scaler(5).reshape(-1).sum())
 
         if config.training.loss_gradient_scaling:
@@ -401,7 +401,6 @@ class BaseGraphModule(pl.LightningModule, ABC):
         data_indices: IndexCollection,
     ) -> torch.nn.ModuleDict:
 
-        print("BUILD METRIC FOR DATASET")
         for metric_name, val_metric_config in validation_metrics_configs.items(): 
             print(metric_name)
             get_loss_function(val_metric_config, scalers=scalers, data_indices=data_indices)
@@ -612,7 +611,6 @@ class BaseGraphModule(pl.LightningModule, ABC):
         torch.Tensor
             Computed loss
         """
-        print("COMPUTE LOSS")
         return self.loss[dataset_name](
             y_pred,
             y,
@@ -1020,7 +1018,6 @@ class BaseGraphModule(pl.LightningModule, ABC):
         batch_idx : int
             Batch inces
         """
-        print("BATCH INDEX:", batch_idx)
         del batch_idx
         assert isinstance(batch, dict), "batch must be a dict keyed by dataset name"
 
